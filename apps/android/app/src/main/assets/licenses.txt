@@ -7,6 +7,12 @@ chúng (trong đó có thành phần GPL-3.0-or-later). APK còn chứa thành p
 không còn là "chỉ GPL". Việc một thư viện đóng nằm chung chương trình với thành phần GPL-3.0 là một
 lo ngại tương thích GPL đã được ghi nhận (như AniBox, LOGO-001/LOGO-004).
 
+TỰ ĐỘNG TẢI: ngay lần đầu AniSub chạy, giọng tiếng Việt mặc định (VAIS-1000, khoảng 64 MB, từ bản
+phát hành AniSub trên GitHub) và gói dịch tiếng Việt của ML Kit (khoảng 30 MB, từ máy chủ Google
+dl.google.com) TỰ TẢI về, không hỏi trước; tiến độ hiện trong Cài đặt AniSub. Khi một phim cần gói dịch
+chưa có (vd. phụ đề tiếng Nhật), gói đó cũng tự tải từ Google nếu "Tự tải gói dịch khi cần" đang bật
+(mặc định bật; tắt trong Cài đặt). Các giọng khác (vd. tiếng Anh) chỉ tải khi bạn chọn.
+
 QUYỀN RIÊNG TƯ: AniSub không thu âm, không chụp màn hình và không gửi phụ đề ra ngoài. AniSub KHÔNG
 có quyền Internet: mọi tệp được tải bằng trình tải xuống của hệ thống Android (Download Manager) —
 gói giọng từ bản phát hành AniSub trên GitHub, mô hình dịch từ máy chủ Google (dl.google.com) — rồi
@@ -33,7 +39,7 @@ THÀNH PHẦN MÃ NGUỒN ĐÓNG TRONG APK (không theo GPL)
   tương ứng, theo Điều khoản dịch vụ ML Kit https://developers.google.com/ml-kit/terms và Giấy phép
   Android SDK. Chỉ dùng để dịch phụ đề và nhận diện ngôn ngữ ngay trên TV. Phần gửi nhật ký sử dụng của
   ML Kit bị tắt (không có backend datatransport). Mô hình dịch (tải ~30 MB, chiếm 45–65 MB mỗi ngôn ngữ)
-  chỉ được tải khi bạn đồng ý trong mục Dịch phụ đề.
+  được tải như mục TỰ ĐỘNG TẢI ở trên, hoặc khi bạn chọn trong mục Mô hình dịch; có thể xóa.
 
 THÀNH PHẦN MÃ NGUỒN MỞ KHÁC TRONG APK
 

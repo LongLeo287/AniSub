@@ -199,6 +199,32 @@ public final class MlKitTranslation implements TranslationScheduler.Translator {
         return true;
     }
 
+    /**
+     * Bytes {done, total} of ML Kit's model download(s) running for this app in the system
+     * DownloadManager (only this app's own downloads are visible); total is -1 when unknown.
+     * Not on the main thread (content-provider query).
+     */
+    public long[] downloadProgress() {
+        long done = 0, total = 0; boolean unknown = false, any = false;
+        try {
+            android.app.DownloadManager dm = (android.app.DownloadManager) app.getSystemService(Context.DOWNLOAD_SERVICE);
+            if (dm == null) return new long[]{0, -1};
+            android.app.DownloadManager.Query q = new android.app.DownloadManager.Query().setFilterByStatus(
+                    android.app.DownloadManager.STATUS_PENDING | android.app.DownloadManager.STATUS_RUNNING | android.app.DownloadManager.STATUS_PAUSED);
+            try (android.database.Cursor c = dm.query(q)) {
+                while (c != null && c.moveToNext()) {
+                    String uri = c.getString(c.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_URI));
+                    if (uri == null || !uri.contains("/translate/")) continue;
+                    any = true;
+                    done += c.getLong(c.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
+                    long t = c.getLong(c.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
+                    if (t <= 0) unknown = true; else total += t;
+                }
+            }
+        } catch (RuntimeException ignored) { }
+        return new long[]{done, !any || unknown ? -1 : total};
+    }
+
     /** Deletes one model, including the files ML Kit leaves behind (asynchronous). Main thread. */
     public void delete(String lang, Done done) {
         if (!available() || LanguageTags.EN.equals(lang)) { if (done != null) done.done(false); return; }

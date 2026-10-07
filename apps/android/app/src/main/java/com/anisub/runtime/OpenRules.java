@@ -39,6 +39,10 @@ public final class OpenRules {
         boolean modelReady(String lang);
         /** On-device language identification is available for "und". */
         boolean detectAvailable();
+        /** "Tự tải gói dịch khi cần" is on (default). */
+        boolean autoDownloadModels();
+        /** A model could be downloaded automatically now (engine usable, enough free space). */
+        boolean canAutoDownload();
     }
 
     public static final class Decision {
@@ -47,9 +51,15 @@ public final class OpenRules {
         public final JSONObject detail;
         /** Cues must be translated from {@link #source} (or a detected source when "und") into {@link #voiceLang}. */
         public final boolean translate;
+        /** Models to download automatically before translating (empty: all installed). */
+        public final List<String> download;
         private Decision(String error, String mode, float rate, String voiceId, String voiceLang, String source, boolean translate, JSONObject detail) {
+            this(error, mode, rate, voiceId, voiceLang, source, translate, detail, Collections.<String>emptyList());
+        }
+        private Decision(String error, String mode, float rate, String voiceId, String voiceLang, String source, boolean translate, JSONObject detail, List<String> download) {
             this.error = error; this.mode = mode; this.rate = rate; this.voiceId = voiceId; this.voiceLang = voiceLang;
             this.source = source; this.translate = translate; this.detail = detail == null ? new JSONObject() : detail;
+            this.download = download;
         }
         public boolean accepted() { return error == null; }
         static Decision reject(String code) { return new Decision(code, null, 0, null, null, null, false, null); }
@@ -68,6 +78,8 @@ public final class OpenRules {
             public String translateUnavailableReason() { return "NO_ENGINE"; }
             public boolean modelReady(String lang) { return LanguageTags.EN.equals(lang); }
             public boolean detectAvailable() { return false; }
+            public boolean autoDownloadModels() { return false; }
+            public boolean canAutoDownload() { return false; }
         }, defaultRate);
     }
 
@@ -126,7 +138,7 @@ public final class OpenRules {
         if (LanguageTags.UND.equals(source)) {
             // Detected from the first cues; the target model must be there already.
             JSONObject missing = missing(env, LanguageTags.EN, voiceLang, "und");
-            if (missing != null) return Decision.reject(TRANSLATE_MODEL_MISSING, missing);
+            if (missing != null) return missingOrDownload(env, missing, rate, voice, voiceLang, source);
             return new Decision(null, MODE_AI, rate, voice, voiceLang, source, true, null);
         }
         if (!LanguageTags.translatable(source)) {
@@ -134,8 +146,22 @@ public final class OpenRules {
             return Decision.reject(TRANSLATE_UNAVAILABLE, d);
         }
         JSONObject missing = missing(env, source, voiceLang, source);
-        if (missing != null) return Decision.reject(TRANSLATE_MODEL_MISSING, missing);
+        if (missing != null) return missingOrDownload(env, missing, rate, voice, voiceLang, source);
         return new Decision(null, MODE_AI, rate, voice, voiceLang, source, true, null);
+    }
+
+    /**
+     * Missing models: with "Tự tải gói dịch khi cần" on, the OPEN is accepted and the service downloads
+     * them (TRANSLATE_MODEL_DOWNLOADING), speaking once they are ready; otherwise, or without space,
+     * TRANSLATE_MODEL_MISSING (reason NO_SPACE when the automatic download is impossible).
+     */
+    private static Decision missingOrDownload(Env env, JSONObject missing, float rate, String voice, String voiceLang, String source) throws JSONException {
+        if (!env.autoDownloadModels()) return Decision.reject(TRANSLATE_MODEL_MISSING, missing);
+        if (!env.canAutoDownload()) return Decision.reject(TRANSLATE_MODEL_MISSING, missing.put("reason", "NO_SPACE"));
+        List<String> list = new ArrayList<>();
+        org.json.JSONArray a = missing.getJSONArray("missing");
+        for (int i = 0; i < a.length(); i++) list.add(a.getString(i));
+        return new Decision(null, MODE_AI, rate, voice, voiceLang, source, true, null, Collections.unmodifiableList(list));
     }
 
     /**

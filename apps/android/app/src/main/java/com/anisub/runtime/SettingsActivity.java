@@ -47,7 +47,7 @@ public final class SettingsActivity extends Activity {
 
     private RuntimeHost host;
     private PackRows vi, en;
-    private Row voice, rate, trStatus, trModels, trTest, anibox, about;
+    private Row voice, rate, trStatus, trAuto, trModels, trTest, anibox, about;
     private final Runnable refresh = this::render;
     private int previewCounter;
     private String previewId, previewPending, previewText;
@@ -122,8 +122,9 @@ public final class SettingsActivity extends Activity {
         root.setPadding(dp(56), dp(32), dp(56), dp(24));
         root.setBackgroundColor(BG);
         root.addView(text("AniSub · Thuyết minh AI", 30, Color.WHITE, true));
-        TextView sub = text("Đọc phụ đề bằng giọng AI chạy ngay trên TV. Phụ đề khác ngôn ngữ giọng đọc được dịch trên TV. "
-                + "Tải gói giọng và mô hình dịch một lần, sau đó dùng không cần mạng.", 16, MUTED, false);
+        TextView sub = text("Đọc phụ đề bằng giọng AI chạy ngay trên TV; phụ đề khác ngôn ngữ giọng đọc được dịch trên TV. "
+                + "Giọng tiếng Việt mặc định (tải từ GitHub của AniSub) và gói dịch tiếng Việt (tải từ máy chủ Google, dl.google.com) "
+                + "tự tải ngay lần đầu chạy; gói dịch khác tự tải khi cần. Sau đó dùng không cần mạng.", 16, MUTED, false);
         sub.setPadding(0, dp(6), 0, dp(18));
         root.addView(sub);
         ScrollView scroll = new ScrollView(this);
@@ -141,6 +142,7 @@ public final class SettingsActivity extends Activity {
         header(list, text("Đọc và dịch", 22, ACCENT, true));
         rate = add(list, "Tốc độ đọc");
         trStatus = add(list, "Dịch phụ đề trên TV");
+        trAuto = add(list, "Tự tải gói dịch khi cần");
         trModels = add(list, "Mô hình dịch");
         trTest = add(list, "Dịch thử");
         anibox = add(list, "Dùng trong AniBox");
@@ -155,6 +157,7 @@ public final class SettingsActivity extends Activity {
             return false;
         });
         trModels.view.setOnClickListener(v -> onModels());
+        trAuto.view.setOnClickListener(v -> { host.setAutoDownloadModels(!host.autoDownloadModels()); render(); });
         trTest.view.setOnClickListener(v -> onTrial());
         about.view.setOnClickListener(v -> onAbout());
         setContentView(root);
@@ -225,8 +228,9 @@ public final class SettingsActivity extends Activity {
         switch (s.state) {
             case DOWNLOADING:
                 int pct = s.totalBytes <= 0 ? 0 : (int) Math.min(100, s.doneBytes * 100 / s.totalBytes);
-                statusText = "Đang tải… " + pct + "% (" + VoicePackManager.formatBytes(s.doneBytes) + " / " + size + ")"
-                        + "\nGiữ màn hình này mở cho tới khi tải xong.";
+                statusText = (LanguageTags.VI.equals(rows.lang) && host.autoDownloadingDefault() ? "Đang tự tải giọng mặc định… " : "Đang tải… ")
+                        + pct + "% (" + VoicePackManager.formatBytes(s.doneBytes) + " / " + size + ")"
+                        + "\nTải bằng trình tải xuống của Android từ GitHub của AniSub, kiểm tra SHA-256 rồi cài.";
                 break;
             case VERIFYING: statusText = "Đang kiểm tra SHA-256 và cài đặt…"; break;
             case READY:
@@ -260,6 +264,11 @@ public final class SettingsActivity extends Activity {
         else if (previewId != null && engineOnThis) previewValue = "Đang đọc…";
         else previewValue = "Đọc một câu mẫu với tốc độ đã chọn.";
         rows.preview.set("Nghe thử " + rows.label, previewValue, canPreview, true);
+        if (LanguageTags.VI.equals(rows.lang)) {
+            // The default voice: always kept (and re-downloaded automatically when missing).
+            rows.delete.set("Giọng mặc định", installed ? "Giọng tiếng Việt mặc định không xóa được (" + size + ")." : null, false, installed);
+            return;
+        }
         rows.delete.set("Xóa " + rows.label, installed ? "Giải phóng " + size + ". Có thể tải lại bất cứ lúc nào." : null, installed && !host.sessionActive()
                 && s.state != VoicePackManager.State.DOWNLOADING && s.state != VoicePackManager.State.VERIFYING, installed);
     }
@@ -270,6 +279,7 @@ public final class SettingsActivity extends Activity {
             String why = tr == null ? "" : translateReason(tr.unavailableReason());
             trStatus.set("Dịch phụ đề trên TV", "Không dùng được trên thiết bị này. " + why
                     + "\nAniSub vẫn đọc phụ đề cùng ngôn ngữ với giọng đọc.", false, true);
+            trAuto.set("Tự tải gói dịch khi cần", null, false, false);
             trModels.set("Mô hình dịch", null, false, false);
             trTest.set("Dịch thử", null, false, false);
             return;
@@ -286,6 +296,9 @@ public final class SettingsActivity extends Activity {
         if (tr.lastDownloadError() != null) st += "\nLần tải trước lỗi: " + downloadError(tr.lastDownloadError());
         st += "\nCần mô hình Tiếng Việt để dịch sang giọng Việt; phụ đề tiếng Nhật cần thêm mô hình Tiếng Nhật.";
         trStatus.set("Dịch phụ đề trên TV", st, false, true);
+        trAuto.set("Tự tải gói dịch khi cần: " + (host.autoDownloadModels() ? "Bật" : "Tắt"),
+                host.autoDownloadModels() ? "Khi phim cần gói dịch chưa có (vd. phụ đề tiếng Nhật), AniSub tự tải từ máy chủ Google rồi đọc. OK để tắt."
+                        : "Tắt: gói dịch thiếu phải tải ở mục Mô hình dịch. OK để bật.", true, true);
         trModels.set("Mô hình dịch", "Tải hoặc xóa mô hình từng ngôn ngữ (tải khoảng 30 MB, chiếm 45–65 MB mỗi ngôn ngữ).", !host.sessionActive(), true);
         boolean canTrial = tr.modelReady(LanguageTags.VI) && !host.sessionActive(); // stays focusable while running (onTrial ignores repeats)
         String tv;
@@ -311,7 +324,7 @@ public final class SettingsActivity extends Activity {
     private void keepFocus() {
         View focused = getCurrentFocus();
         if (focused != null && focused.isFocusable() && focused.getVisibility() == View.VISIBLE) return;
-        for (Row r : new Row[]{vi.action, vi.preview, en.action, en.preview, rate, trModels, voice, vi.delete, en.delete, about}) {
+        for (Row r : new Row[]{vi.action, vi.preview, en.action, en.preview, rate, trAuto, trModels, voice, vi.delete, en.delete, about}) {
             if (r.view.isFocusable() && r.view.getVisibility() == View.VISIBLE) { r.view.requestFocus(); return; }
         }
     }
@@ -325,7 +338,10 @@ public final class SettingsActivity extends Activity {
         VoicePackManager voices = rows.manager();
         if (voices == null) return;
         VoicePackManager.Status s = voices.status();
-        if (s.state == VoicePackManager.State.DOWNLOADING) { voices.cancel(); return; }
+        if (s.state == VoicePackManager.State.DOWNLOADING) {
+            if (LanguageTags.VI.equals(rows.lang)) host.pauseAutoVoice(); // the user stopped it: no automatic retry until restart
+            voices.cancel(); return;
+        }
         VoiceCatalog.Pack pack = s.pack;
         if (pack == null) return;
         if (host.sessionActive()) { info("Đang phát trong AniBox", "Dừng phát trong AniBox rồi tải hoặc cập nhật giọng để không làm giật phim."); return; }
@@ -338,6 +354,7 @@ public final class SettingsActivity extends Activity {
             if (host.sessionActive() || host.anyPackBusy()) return;
             // Free the resident model first so the post-install smoke test never holds two copies.
             if (host.engine() != null) host.engine().unload();
+            if (LanguageTags.VI.equals(rows.lang)) host.resumeAutoVoice();
             voices.download(true);
         });
     }

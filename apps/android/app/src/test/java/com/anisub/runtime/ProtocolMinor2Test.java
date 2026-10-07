@@ -33,6 +33,7 @@ public class ProtocolMinor2Test {
     static OpenRules.Env env(JSONObject e) throws JSONException {
         final Set<String> packs = set(e, "packs"), models = set(e, "models");
         final boolean system = e.optBoolean("system"), translate = e.optBoolean("translate"), detect = e.optBoolean("detect");
+        final boolean auto = e.optBoolean("autoDownload", false), space = e.optBoolean("space", true);
         final String reason = e.optString("reason", "NO_ENGINE");
         return new OpenRules.Env() {
             public boolean systemReady() { return system; }
@@ -42,6 +43,8 @@ public class ProtocolMinor2Test {
             public String translateUnavailableReason() { return translate ? null : reason; }
             public boolean modelReady(String l) { return "en".equals(l) || models.contains(l); }
             public boolean detectAvailable() { return translate && detect; }
+            public boolean autoDownloadModels() { return auto; }
+            public boolean canAutoDownload() { return translate && space; }
         };
     }
 
@@ -73,6 +76,7 @@ public class ProtocolMinor2Test {
                 assertEquals(name, expect.getString("voiceLang"), d.voiceLang);
                 assertEquals(name, expect.getBoolean("translate"), d.translate);
                 if (expect.has("source")) assertEquals(name, expect.getString("source"), d.source);
+                assertEquals(name + " download", expect.has("download") ? expect.getJSONArray("download").toString() : "[]", new JSONArray(d.download).toString());
             }
         }
     }

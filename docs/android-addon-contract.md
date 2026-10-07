@@ -144,7 +144,18 @@ Admission (mode `"ai"`), in order; a refused OPEN gets an ERROR whose extra fiel
 2. source == voiceLang (`vi`+`vi`, `en`+`en`) -> accepted, no translation.
 3. engine unavailable -> **`TRANSLATE_UNAVAILABLE`** `{voiceLang, reason, language?}`.
 4. source not an ML Kit language -> **`TRANSLATE_UNAVAILABLE`** `{voiceLang, language, reason:"UNSUPPORTED_LANGUAGE"}`.
-5. a needed model is not installed -> **`TRANSLATE_MODEL_MISSING`** `{language: first missing, from, to, voiceLang, missing:[...]}`.
+5. a needed model is not installed:
+   - with **"Tự tải gói dịch khi cần"** on (AniSub setting, default ON; `settings` is not on the wire
+     in 0.3.0): OPEN is **accepted**; AniSub downloads the missing models one at a time through the
+     system DownloadManager and sends **`TRANSLATE_MODEL_DOWNLOADING`** `{session, revision, language
+     (being fetched), missing:[...], doneBytes, totalBytes (-1 unknown)}` about every 2 s while bytes
+     move, then **`TRANSLATE_MODEL_READY`** `{session, revision}`; speech starts after that (cues
+     that end meanwhile get `EXPIRED`). These are NOT `ERROR` messages, so AniBox main (which treats
+     a cue-less ERROR as a runtime error and ignores unknown types) keeps the session; a minor-2
+     client shows "Đang tải gói dịch…". A failed download ends translation for the session with
+     ERROR `TRANSLATE_MODEL_MISSING` `{..., reason:"DOWNLOAD_FAILED"}`; no free space (200 MB kept)
+     gives `reason:"NO_SPACE"` (at OPEN or later).
+   - with the toggle off: **`TRANSLATE_MODEL_MISSING`** `{language: first missing, from, to, voiceLang, missing:[...]}`.
    ML Kit pivots through English: en->vi needs `vi`; ja->vi needs `ja`+`vi`; vi->en needs `vi`; ja->en needs `ja`.
    The user downloads models in AniSub settings (consent dialog); AniBox can open them with the
    `com.anisub.runtime.action.SETTINGS` intent.
@@ -153,7 +164,17 @@ Admission (mode `"ai"`), in order; a refused OPEN gets an ERROR whose extra fiel
    characters, or 1.5 s after the first cue) and sends **`LANGUAGE_DETECTED`** `{session, revision,
    language, assumed}`. Without identification (or when it cannot tell) English is assumed
    (`assumed:true`). If the detected language then lacks a model, one session-level ERROR
-   `TRANSLATE_MODEL_MISSING` / `TRANSLATE_UNAVAILABLE` (same fields) follows and the cues fail with it.
+   `TRANSLATE_MODEL_MISSING` / `TRANSLATE_UNAVAILABLE` (same fields) follows and the cues fail with it
+   (with the automatic download on, a missing detected-language model is downloaded as in step 5).
+
+**First run (owner 07-10-2026, "Tự tải ngay sau khi cài").** As soon as AniSub runs (AniBox binding the
+service, or the app opened), the default Vietnamese voice pack (`vi-vais1000-medium`, 64 MB, GitHub)
+and the Vietnamese ML Kit model (~30 MB, Google) download automatically, without a consent prompt,
+through the system DownloadManager; failures retry after 30 s, 2 min, 10 min, 30 min, then hourly.
+AniBox sees `voicePack.state` / `voices.vi.state` DOWNLOADING (with `doneBytes`) then READY, and
+`translate.models.vi` downloading then ready. The Vietnamese voice cannot be deleted in settings and is
+re-fetched if missing. The English voice stays a manual download: with `voiceLang:"en"` and no pack,
+OPEN gets `VOICE_PACK_MISSING {voiceLang:"en"}` and AniBox should say "tải giọng Anh trong Cài đặt AniSub".
 
 Translation failures during a session are per cue: ERROR `{code, cueId}` with
 `TRANSLATE_MODEL_MISSING` / `TRANSLATE_UNAVAILABLE` (fatal for the pair: every pending cue fails at
@@ -203,7 +224,13 @@ confirmation. BACK closes it. The app also has LAUNCHER + LEANBACK_LAUNCHER entr
 
 `apps/android/tools/make-release-manifest.mjs` writes `anisub.json` next to the signed APK:
 `{schemaVersion:1, versionCode, versionName, apk:"https://github.com/LongLeo287/AniSub/releases/latest/download/AniSub.apk",
-sha256, signerSha256, notes}`. AniBox must verify the downloaded APK's SHA-256 and that its signer
+sha256, signerSha256, notes, mandatory?}`.
+
+`mandatory` (owner 07-10-2026: AniSub updates are mandatory, like AniBox's) is an optional boolean,
+**true when absent**; `false` marks a soft update. AniBox checks `anisub.json` when it opens and, for
+a mandatory newer `versionCode`, forces the AniSub update before Home (no skip, no close; AniBox lane
+feat/forced-update). The versionCode / sha256 / signerSha256 rules below are unchanged. AniSub 0.3.0
+itself has no update screen; it only documents the field. AniBox must verify the downloaded APK's SHA-256 and that its signer
 SHA-256 equals both the manifest value and AniBox's own signer before installing.
 
 ## 6. Legacy notes

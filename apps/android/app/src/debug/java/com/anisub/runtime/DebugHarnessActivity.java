@@ -108,6 +108,8 @@ public final class DebugHarnessActivity extends Activity {
                 case "session": timelineFlag = intent.getBooleanExtra("timeline", true); session(arg(intent, "from", "en"), arg(intent, "to", "vi"), intent.getIntExtra("cues", 20)); break;
                 case "cleanup": cleanup(); break;
                 case "dm-probe": dmProbe(arg(intent, "lang", "vi")); break;
+                case "sim-first-run": simFirstRun(); break;
+                case "restore-first-run": restoreFirstRun(); break;
                 default: log("unknown cmd");
             }
         } catch (Exception e) { log("FAILED " + e); }
@@ -326,6 +328,40 @@ public final class DebugHarnessActivity extends Activity {
             //noinspection ResultOfMethodCallIgnored
             dir.delete();
         }, "dm-probe").start();
+    }
+
+    /**
+     * Simulates a fresh install WITHOUT deleting the owner's data: the voice store is moved aside to
+     * files/voices.harness-bak and the first-run flag cleared, then the process exits. The next start
+     * (open AniSub) runs the real first-run automatic downloads. restore-first-run puts it back.
+     */
+    private void simFirstRun() {
+        if (host.engine() != null) host.engine().unload();
+        File voices = new File(getFilesDir(), "voices"), bak = new File(getFilesDir(), "voices.harness-bak");
+        if (bak.exists()) { log("backup exists already; restore first"); return; }
+        log("moved voices aside: " + voices.renameTo(bak));
+        getSharedPreferences(RuntimeHost.PREFS, MODE_PRIVATE).edit().remove(RuntimeHost.KEY_FIRST_RUN_MODEL).commit();
+        log("first-run flag cleared; exiting process");
+        main.postDelayed(() -> { finishAffinity(); android.os.Process.killProcess(android.os.Process.myPid()); }, 300);
+    }
+
+    private void restoreFirstRun() {
+        if (host.engine() != null) host.engine().unload();
+        File voices = new File(getFilesDir(), "voices"), bak = new File(getFilesDir(), "voices.harness-bak");
+        if (!bak.isDirectory()) { log("no backup"); return; }
+        main.postDelayed(() -> {
+            deleteTree(voices, 0);
+            log("restored original voices: " + bak.renameTo(voices) + "; exiting process");
+            main.postDelayed(() -> { finishAffinity(); android.os.Process.killProcess(android.os.Process.myPid()); }, 300);
+        }, 1000);
+    }
+
+    private static void deleteTree(File f, int depth) {
+        if (depth > 32) return;
+        File[] c = f.isDirectory() ? f.listFiles() : null;
+        if (c != null) for (File x : c) deleteTree(x, depth + 1);
+        //noinspection ResultOfMethodCallIgnored
+        f.delete();
     }
 
     /** Removes what the harness installed: the English pack, ML Kit models, side-loaded files. */

@@ -15,6 +15,7 @@ import com.anisub.runtime.models.ModelStore;
 import com.anisub.runtime.models.StorageBudget;
 import com.anisub.runtime.translate.LanguageTags;
 import com.anisub.runtime.translate.MlKitTranslation;
+import com.anisub.runtime.voice.AutoDownloader;
 import com.anisub.runtime.voice.DebugSources;
 import com.anisub.runtime.voice.EspeakData;
 import com.anisub.runtime.voice.SystemDownloadFetcher;
@@ -37,6 +38,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public final class RuntimeHost {
     public static final String PREFS = "anisub";
     public static final String KEY_RATE = "defaultRate", KEY_VOICE = "voice";
+    /** "Tự tải gói dịch khi cần" (default on); "firstRunModel" = the first-run vi model download finished. */
+    public static final String KEY_AUTO_MODELS = "autoDownloadModels", KEY_FIRST_RUN_MODEL = "firstRunModel";
+    /** Free space kept when a translation model is downloaded automatically. */
+    public static final long MODEL_SPACE_BYTES = 200L << 20;
     @android.annotation.SuppressLint("StaticFieldLeak") // holds the Application context only
     private static RuntimeHost instance;
 
@@ -56,6 +61,8 @@ public final class RuntimeHost {
     private final String versionName;
     private final long versionCode;
     private volatile boolean sessionActive;
+    private AutoDownloader voiceAuto, modelAuto;
+    private boolean voiceWasBusy;
 
     public static synchronized RuntimeHost get(Context context) {
         if (instance == null) instance = new RuntimeHost(context.getApplicationContext());
@@ -78,6 +85,59 @@ public final class RuntimeHost {
         versionName = name; versionCode = code;
         openStore();
         translation = new MlKitTranslation(context, this::changed);
+        startAutoDownloads();
+    }
+
+    // ---------------------------------------------------------------- first run (owner 07-10-2026)
+    /**
+     * "Tự tải ngay sau khi cài": the default Vietnamese voice pack and the Vietnamese translation model
+     * download automatically as soon as AniSub runs (service bind or app launch), without a consent
+     * prompt; progress shows in settings and CAPABILITIES. Failures retry with backoff. The voice is
+     * re-fetched whenever it is missing; the model only on the first run (later on demand).
+     */
+    private void startAutoDownloads() {
+        voiceAuto = new AutoDownloader(new AutoDownloader.Target() {
+            public boolean installed() { return voices != null && voices.installed() != null; }
+            public boolean busy() { return anyPackBusy(); }
+            public boolean start() { return voices != null && voices.download(true); }
+        }, main::postDelayed);
+        modelAuto = new AutoDownloader(new AutoDownloader.Target() {
+            public boolean installed() { return prefs.getBoolean(KEY_FIRST_RUN_MODEL, false) || translation.modelReady(LanguageTags.VI); }
+            public boolean busy() { return translation.busy(); }
+            public boolean start() {
+                return startModelDownload(LanguageTags.VI, ok -> {
+                    if (ok) prefs.edit().putBoolean(KEY_FIRST_RUN_MODEL, true).apply();
+                    modelAuto.finished(ok);
+                });
+            }
+        }, main::postDelayed);
+        main.post(() -> { voiceAuto.kick(); if (translation.available()) modelAuto.kick(); });
+    }
+
+    /** A pack manager reported a change: detect the end of the default pack's download. */
+    private void packChanged() {
+        main.post(() -> {
+            boolean busy = voices != null && voices.busy();
+            if (voiceWasBusy && !busy && voiceAuto != null) voiceAuto.finished(voices.installed() != null);
+            voiceWasBusy = busy;
+        });
+    }
+
+    /** The default voice download in progress was started automatically (no consent prompt shown). */
+    public boolean autoDownloadingDefault() { return voices != null && voices.busy() && voices.installed() == null; }
+    /** The user cancelled the automatic download: no retries until the next start. */
+    public void pauseAutoVoice() { if (voiceAuto != null) voiceAuto.pause(); }
+    public void resumeAutoVoice() { if (voiceAuto != null) voiceAuto.resume(); }
+
+    public boolean autoDownloadModels() { return prefs.getBoolean(KEY_AUTO_MODELS, true); }
+    public void setAutoDownloadModels(boolean on) { prefs.edit().putBoolean(KEY_AUTO_MODELS, on).apply(); changed(); }
+
+    /** Starts one ML Kit model download when the engine runs, nothing else downloads and space allows. */
+    public boolean startModelDownload(String lang, MlKitTranslation.Done done) {
+        return canAutoDownloadModel() && translation.download(lang, done);
+    }
+    public boolean canAutoDownloadModel() {
+        return translation.available() && !translation.busy() && app.getNoBackupFilesDir().getUsableSpace() >= MODEL_SPACE_BYTES;
     }
 
     @SuppressWarnings("deprecation")
@@ -93,7 +153,7 @@ public final class RuntimeHost {
             Map<String, VoicePackManager> byLanguage = new LinkedHashMap<>();
             for (String lang : LanguageTags.VOICE) {
                 VoiceCatalog.Pack pack = catalog.forLanguage(lang);
-                if (pack != null) byLanguage.put(lang, new VoicePackManager(store, catalog, pack.id, source, this::smokeTest, s -> changed()));
+                if (pack != null) byLanguage.put(lang, new VoicePackManager(store, catalog, pack.id, source, this::smokeTest, s -> { changed(); packChanged(); }));
             }
             packs = Collections.unmodifiableMap(byLanguage);
             voices = byLanguage.get(LanguageTags.VI);
@@ -178,6 +238,7 @@ public final class RuntimeHost {
         deleteTree(root, 0);
         openStore();
         changed();
+        if (voiceAuto != null) voiceAuto.resume();
         return voices != null;
     }
 

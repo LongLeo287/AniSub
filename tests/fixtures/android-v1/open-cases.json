@@ -1,5 +1,5 @@
 {
-  "comment": "Protocol major 1 / minor 2 OPEN admission cases (AniSub runtime). env = what the runtime has; message = OPEN fields beyond the session envelope; expect = the decision. Shared by the Android JVM tests (ProtocolMinor2Test) and the Node contract test. Error detail keys are added to the ERROR reply next to type/major/code/session/revision.",
+  "comment": "Protocol major 1 / minor 2 OPEN admission cases (AniSub runtime). env.autoDownload = Tu tai goi dich khi can (absent = off); env.space = enough free space for it (absent = true). env = what the runtime has; message = OPEN fields beyond the session envelope; expect = the decision. Shared by the Android JVM tests (ProtocolMinor2Test) and the Node contract test. Error detail keys are added to the ERROR reply next to type/major/code/session/revision.",
   "cases": [
     {"name": "minor1-ai-vi-no-voiceLang", "env": {"packs": ["vi"]}, "language": "vi", "message": {"mode": "ai"},
      "expect": {"mode": "ai", "voiceLang": "vi", "translate": false}},
@@ -37,6 +37,12 @@
      "expect": {"error": "MALFORMED"}},
     {"name": "system-mode-stays-vietnamese", "env": {"system": true, "packs": ["en"]}, "language": "vi", "message": {"systemTest": true, "voiceLang": "en"},
      "expect": {"error": "UNSUPPORTED"}},
+    {"name": "auto-download-missing-models", "env": {"packs": ["vi"], "translate": true, "models": [], "autoDownload": true, "space": true}, "language": "ja", "message": {"mode": "ai"},
+     "expect": {"mode": "ai", "voiceLang": "vi", "translate": true, "source": "ja", "download": ["ja", "vi"]}},
+    {"name": "auto-download-no-space", "env": {"packs": ["vi"], "translate": true, "models": ["vi"], "autoDownload": true, "space": false}, "language": "ja", "message": {"mode": "ai"},
+     "expect": {"error": "TRANSLATE_MODEL_MISSING", "detail": {"language": "ja", "missing": ["ja"], "reason": "NO_SPACE"}}},
+    {"name": "auto-download-und-target", "env": {"packs": ["vi"], "translate": true, "models": [], "detect": true, "autoDownload": true, "space": true}, "language": "und", "message": {"mode": "ai"},
+     "expect": {"mode": "ai", "voiceLang": "vi", "translate": true, "source": "und", "download": ["vi"]}},
     {"name": "voice-from-other-pack-rejected", "env": {"packs": ["vi", "en"]}, "language": "en", "message": {"mode": "ai", "voiceLang": "en", "voice": "vais1000"},
      "expect": {"error": "UNSUPPORTED"}}
   ]

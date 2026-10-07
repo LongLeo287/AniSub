@@ -47,6 +47,14 @@ public final class AniSubService extends Service {
     private String voiceLang = LanguageTags.VI;
     /** Translation for this session: on, the source ("und" until detected) and a fatal failure code. */
     private boolean translating;
+    private List<String> openDownload;
+    private final ArrayDeque<String> modelQueue = new ArrayDeque<>();
+    private boolean modelWait;
+    private String modelStarted;
+    private long modelGeneration, lastProgress;
+    private Runnable modelPoll = () -> { };
+    private final java.util.concurrent.ExecutorService progressWorker = java.util.concurrent.Executors.newSingleThreadExecutor();
+    static final long MODEL_POLL_MS = 2000;
     /** The OPEN decision's translation setting, restored when the content changes (EPISODE/SOURCE_CHANGE). */
     private boolean openTranslate;
     private String openSource = LanguageTags.VI;
@@ -127,6 +135,8 @@ public final class AniSubService extends Service {
             public String translateUnavailableReason() { return tr == null ? "NO_ENGINE" : tr.unavailableReason(); }
             public boolean modelReady(String lang) { return tr != null && tr.modelReady(lang); }
             public boolean detectAvailable() { return tr != null && tr.detectAvailable(); }
+            public boolean autoDownloadModels() { return host.autoDownloadModels(); }
+            public boolean canAutoDownload() { return tr != null && tr.available() && host.canAutoDownloadModel() || tr != null && tr.busy(); }
         };
     }
 
@@ -178,7 +188,7 @@ public final class AniSubService extends Service {
             boolean newSession = "OPEN".equals(type) || !Objects.equals(session, id);
             if (newSession || rev != revision) {
                 cancel(); intake.restart(pos);
-                if (newSession) { openTranslate = false; resetContent(); }
+                if (newSession) { openTranslate = false; openDownload = null; resetContent(); }
             }
             session = id; revision = rev; position = pos; speed = rate; anchor = SystemClock.elapsedRealtime();
             if ("CUES".equals(type)) {
@@ -204,7 +214,7 @@ public final class AniSubService extends Service {
                 boolean ai = OpenRules.MODE_AI.equals(mode);
                 host.setSessionActive(ai);
                 if (ai) {
-                    openTranslate = decision.translate; openSource = decision.source;
+                    openTranslate = decision.translate; openSource = decision.source; openDownload = decision.download;
                     resetContent();
                     // A session without translation frees any translator/identifier a previous one left.
                     if (!openTranslate && host.translation() != null) host.translation().releaseClients();
@@ -219,7 +229,7 @@ public final class AniSubService extends Service {
                 if ("PAUSE".equals(type) || "STOP".equals(type) || "CLOSE".equals(type)
                         || "EPISODE_CHANGE".equals(type) || "SOURCE_CHANGE".equals(type)) playing = false;
                 if ("EPISODE_CHANGE".equals(type) || "SOURCE_CHANGE".equals(type)) resetContent();
-                if ("CLOSE".equals(type)) { openTranslate = false; resetContent(); session = null; endAiSession(); }
+                if ("CLOSE".equals(type)) { openTranslate = false; openDownload = null; resetContent(); session = null; endAiSession(); }
             }
             scheduleTick();
             drain();
@@ -233,6 +243,7 @@ public final class AniSubService extends Service {
      * with the OPEN decision's pair ("und" is detected again for the new content).
      */
     private void resetContent() {
+        stopModelWait();
         timeline.clear();
         translating = openTranslate;
         if (translating) scheduler.reset(openSource, voiceLang); else scheduler.clear();
@@ -240,6 +251,68 @@ public final class AniSubService extends Service {
         detecting = translating && LanguageTags.UND.equals(openSource);
         detectRequested = false; detectText.setLength(0); detectCues = 0; detectGeneration++;
         handler.removeCallbacks(detectTimeout);
+        if (translating && openDownload != null && !openDownload.isEmpty()) waitForModels(openDownload);
+    }
+
+    // ------------------------------------------------------------------ missing models: automatic download
+    /**
+     * "Tự tải gói dịch khi cần": the session's missing ML Kit models download one at a time through the
+     * system DownloadManager; AniBox gets TRANSLATE_MODEL_DOWNLOADING (with progress) and then
+     * TRANSLATE_MODEL_READY, and speech starts once they are installed. A failure ends translation for
+     * the session with TRANSLATE_MODEL_MISSING {reason:"DOWNLOAD_FAILED"|"NO_SPACE"}.
+     */
+    private void waitForModels(List<String> langs) {
+        modelQueue.clear(); modelQueue.addAll(langs); modelWait = true; modelStarted = null; final long gen = ++modelGeneration;
+        lastProgress = -2;
+        handler.removeCallbacks(modelPoll);
+        modelPoll = () -> pollModels(gen);
+        handler.post(modelPoll);
+    }
+    private void stopModelWait() { modelWait = false; modelQueue.clear(); modelGeneration++; handler.removeCallbacks(modelPoll); }
+    private void pollModels(final long gen) {
+        if (gen != modelGeneration || !modelWait || session == null) return;
+        final MlKitTranslation tr = host.translation();
+        while (!modelQueue.isEmpty() && tr.modelReady(modelQueue.peek())) modelQueue.poll();
+        if (modelQueue.isEmpty()) {
+            modelWait = false;
+            JSONObject ready = new JSONObject();
+            try { send(ready.put("type", "TRANSLATE_MODEL_READY").put("major", 1).put("session", session).put("revision", revision)); } catch (JSONException ignored) { }
+            drain();
+            return;
+        }
+        final String lang = modelQueue.peek();
+        if (!tr.busy()) {
+            if (lang.equals(modelStarted)) { // ours finished without installing it
+                modelWait = false;
+                try { failTranslation(OpenRules.TRANSLATE_MODEL_MISSING, new JSONObject().put("language", lang).put("voiceLang", voiceLang)
+                        .put("missing", new JSONArray(new ArrayList<>(modelQueue))).put("reason", "DOWNLOAD_FAILED")); } catch (JSONException ignored) { }
+                drain();
+                return;
+            }
+            if (!host.startModelDownload(lang, ok -> handler.post(modelPoll))) {
+                modelWait = false;
+                try { failTranslation(OpenRules.TRANSLATE_MODEL_MISSING, new JSONObject().put("language", lang).put("voiceLang", voiceLang)
+                        .put("missing", new JSONArray(new ArrayList<>(modelQueue))).put("reason", "NO_SPACE")); } catch (JSONException ignored) { }
+                drain();
+                return;
+            }
+            modelStarted = lang;
+        }
+        progressWorker.execute(() -> {
+            final long[] p = tr.downloadProgress();
+            handler.post(() -> {
+                if (gen != modelGeneration || !modelWait) return;
+                if (p[0] != lastProgress) {
+                    lastProgress = p[0];
+                    try {
+                        send(new JSONObject().put("type", "TRANSLATE_MODEL_DOWNLOADING").put("major", 1).put("session", session).put("revision", revision)
+                                .put("language", lang).put("missing", new JSONArray(new ArrayList<>(modelQueue))).put("doneBytes", p[0]).put("totalBytes", p[1]));
+                    } catch (JSONException ignored) { }
+                }
+            });
+        });
+        handler.removeCallbacks(modelPoll);
+        handler.postDelayed(modelPoll, MODEL_POLL_MS);
     }
 
     private void addToTimeline(Job job) {
@@ -292,7 +365,7 @@ public final class AniSubService extends Service {
     private void tick() {
         if (session == null) return;
         promote();
-        if (aiMode() && translating && scheduler.active() && translateFailure == null) {
+        if (aiMode() && translating && scheduler.active() && translateFailure == null && !modelWait) {
             long now = mediaNow();
             scheduler.lookahead(timeline.window(now, now + TranslationScheduler.LOOKAHEAD_MS, LOOKAHEAD_BATCH), TextCleaner::clean);
         }
@@ -354,7 +427,12 @@ public final class AniSubService extends Service {
                 failTranslation(OpenRules.TRANSLATE_UNAVAILABLE, new JSONObject().put("language", lang).put("reason", "UNSUPPORTED_LANGUAGE").put("voiceLang", voiceLang));
             } else {
                 JSONObject missing = OpenRules.missing(env(), lang, voiceLang, lang);
-                if (missing != null) failTranslation(OpenRules.TRANSLATE_MODEL_MISSING, missing);
+                if (missing != null && host.autoDownloadModels() && (host.canAutoDownloadModel() || host.translation().busy())) {
+                    scheduler.setSource(lang);
+                    List<String> list = new ArrayList<>();
+                    for (int i = 0; i < missing.getJSONArray("missing").length(); i++) list.add(missing.getJSONArray("missing").getString(i));
+                    waitForModels(list);
+                } else if (missing != null) failTranslation(OpenRules.TRANSLATE_MODEL_MISSING, missing);
                 else scheduler.setSource(lang);
             }
         } catch (JSONException ignored) { }
@@ -386,6 +464,7 @@ public final class AniSubService extends Service {
         if (!translating) { job.spoken = job.clean; return TextSplitter.speakable(job.spoken) ? READY : SKIP; }
         if (translateFailure != null) { failed[0] = translateFailure; return SKIP; }
         if (scheduler.waitingForSource()) return WAIT; // LANGUAGE_DETECTED (or its timeout) drains again
+        if (modelWait) return WAIT; // TRANSLATE_MODEL_READY drains again
         String result = scheduler.result(job.id);
         if (result != null) { job.spoken = result; return TextSplitter.speakable(result) ? READY : SKIP; }
         String error = scheduler.error(job.id);

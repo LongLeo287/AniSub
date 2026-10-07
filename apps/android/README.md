@@ -81,7 +81,8 @@ Legacy dependency-free gate (unchanged baseline, 4,296 checks):
    then `apksigner verify --verbose AniSub.apk` must report v1 and v2 true. (Alternatively a local,
    Git-ignored `keystore.properties` makes Gradle sign the release with v1 + v2.)
 2. `node tools/make-release-manifest.mjs AniSub.apk --notes "..."` writes `anisub.json`
-   (versionCode, versionName, apk URL, sha256, signerSha256).
+   (versionCode, versionName, apk URL, sha256, signerSha256). Optional `"mandatory"`: absent or
+   `true` = AniBox forces the update before Home; add `"mandatory": false` by hand for a soft update.
 3. Publish `AniSub.apk` + `anisub.json` on a GitHub release of `LongLeo287/AniSub`.
 4. Voice pack: `node tools/build-voice-pack.mjs <extracted vits-piper-vi_VN-vais1000-medium>` produces
    the 11 `vais1000-*` assets; upload them to the release tagged **`voices-v1`** (URLs are pinned in

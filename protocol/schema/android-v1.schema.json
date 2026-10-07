@@ -98,8 +98,23 @@
         "session": { "type": "string" }, "revision": { "type": "integer" }, "cueId": { "type": "string" },
         "voiceLang": { "type": "string" }, "language": { "type": "string" }, "from": { "type": "string" }, "to": { "type": "string" },
         "missing": { "type": "array", "items": { "type": "string" } },
-        "reason": { "type": "string", "enum": ["NO_DOWNLOAD_MANAGER", "NATIVE_UNAVAILABLE", "NO_ENGINE", "UNSUPPORTED_LANGUAGE", "UNAVAILABLE"] }
+        "reason": { "type": "string", "enum": ["NO_DOWNLOAD_MANAGER", "NATIVE_UNAVAILABLE", "NO_ENGINE", "UNSUPPORTED_LANGUAGE", "UNAVAILABLE", "NO_SPACE", "DOWNLOAD_FAILED"] }
       }
+    },
+    "translateModelDownloading": {
+      "$comment": "Not an ERROR: the OPEN was accepted and missing models download automatically (Tu tai goi dich khi can); speech starts after TRANSLATE_MODEL_READY. totalBytes -1 = unknown.",
+      "type": "object",
+      "required": ["type", "major", "session", "revision", "language", "missing", "doneBytes", "totalBytes"],
+      "properties": {
+        "type": { "const": "TRANSLATE_MODEL_DOWNLOADING" }, "major": { "const": 1 }, "session": { "type": "string" },
+        "revision": { "type": "integer" }, "language": { "type": "string" }, "missing": { "type": "array", "items": { "type": "string" } },
+        "doneBytes": { "type": "integer", "minimum": 0 }, "totalBytes": { "type": "integer", "minimum": -1 }
+      }
+    },
+    "translateModelReady": {
+      "type": "object",
+      "required": ["type", "major", "session", "revision"],
+      "properties": { "type": { "const": "TRANSLATE_MODEL_READY" }, "major": { "const": 1 }, "session": { "type": "string" }, "revision": { "type": "integer" } }
     },
     "languageDetected": {
       "type": "object",
