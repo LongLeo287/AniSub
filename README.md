@@ -47,7 +47,9 @@ benchmark realtime. [Hướng dẫn harness](docs/windows-harness.md) phân bi�
 
 ## Cài AniSub trên Android TV
 
-AniSub là phần bổ trợ của AniBox: AniBox phát phim, AniSub đọc phụ đề tiếng Việt bằng giọng AI.
+AniSub là phần bổ trợ của AniBox: AniBox phát phim, AniSub đọc phụ đề bằng giọng AI. Từ 0.3.0, phụ đề khác
+ngôn ngữ giọng đọc được dịch ngay trên TV, nên AI Thuyết minh dùng được trên mọi video có phụ đề, kể cả phim hardsub
+(AniBox tìm phụ đề chữ chạy ngầm và khớp giờ).
 
 1. Cài AniBox trước (bình thường). AniSub cài sau vẫn kết nối được, không cần cài lại AniBox.
 2. Cài AniSub:
@@ -58,11 +60,15 @@ AniSub là phần bổ trợ của AniBox: AniBox phát phim, AniSub đọc ph�
    64 MB, từ GitHub của AniSub) và gói dịch tiếng Việt (khoảng 30 MB, từ máy chủ Google) **tự tải**;
    mở **AniSub** để xem tiến độ, giấy phép và bấm **Nghe thử**. AniSub không có quyền Internet: mọi tệp
    được tải bằng trình tải xuống của Android rồi kiểm tra SHA-256. Giọng tiếng Anh là tùy chọn.
-4. Trong AniBox, bật thuyết minh và chọn **Giọng AI (AniSub)**. Khi giọng AI đọc, AniBox tự giảm
-   âm lượng phim rồi trả lại khi đọc xong.
+4. Trong AniBox, vào **Cài đặt › AniSub** chọn **Ngôn ngữ giọng đọc** (Việt hoặc Anh), rồi bấm chip
+   **Thuyết minh** trong trình phát. Khi giọng AI đọc, AniBox tự giảm âm lượng phim rồi trả lại khi đọc xong.
+5. Cập nhật: khi có AniSub mới, AniBox bắt cập nhật lúc mở app (trường `mandatory` trong `anisub.json`; vắng
+   mặt hoặc `true` là bắt buộc, `false` là cập nhật mềm). Phần quản lý giọng đọc (thêm giọng nam, giọng Google)
+   hoãn sang bản sau; 0.3.0 có giọng Việt và giọng Anh.
 
 Hai ứng dụng phải cùng chữ ký phát hành (bản chính thức đã như vậy; người dùng không cần khóa nào).
-Không thu âm, không chụp màn hình, không gửi phụ đề đi đâu; mạng chỉ dùng để tải gói giọng.
+Không thu âm, không chụp màn hình, không gửi phụ đề đi đâu; mạng chỉ dùng để tải gói giọng và gói dịch
+(qua trình tải xuống của Android).
 Gỡ AniSub sẽ xóa luôn gói giọng; AniBox vẫn phát phim bình thường.
 
 Chi tiết kỹ thuật: [apps/android/README.md](apps/android/README.md),
@@ -95,7 +101,7 @@ AniSub/
 ├── providers/               adapter OCR / ASR / translation / TTS
 ├── model-manager/           manifest, download, integrity, storage, load leases
 ├── apps/
-│   ├── android/             APK AniSub cho TV: giọng AI sherpa-onnx, tải gói giọng, Messenger 1.1
+│   ├── android/             APK AniSub cho TV: giọng AI sherpa-onnx, tải gói giọng và gói dịch, dịch trên máy, Messenger 1.2
 │   └── desktop/             harness Node + prototype Windows WPF/model worker
 ├── clients/                 kế hoạch SDK AniBox và Chrome companion mỏng; addon AniBox do Claude phụ trách
 ├── tests/                   fixtures, contract, integration, performance
