@@ -12,6 +12,12 @@ fields can be omitted by fixtures, but future wire implementations must finalize
 
 ## Current Android private transport versus next contract
 
+2026-10-07 (ANISUB-004): the shipping Android Messenger contract is **major 1 / minor 2**
+(translation into the voice language, English voice, cues ahead of time). Its normative fields are
+in [android-addon-contract.md](android-addon-contract.md) section 3b, with the schema
+`protocol/schema/android-v1.schema.json` and shared fixtures `tests/fixtures/android-v1/`. The
+paragraphs below describe the earlier private test and remain true for minor-1 clients.
+
 The current `apps/android/` companion implements test-only Messenger (`what=1`, Bundle string
 `payload`, maximum 16,384 UTF-16 units). It requires exact `com.anibox.tv` caller identity and a
 matching signing certificate, checks caller UID before reading the Bundle, and uses the signature

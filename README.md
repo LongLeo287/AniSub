@@ -13,7 +13,9 @@ OCR Việt/Anh và ASR thu âm riêng tiến trình. Turbo/codec/Whisper/OCR đ�
 Chrome extension cần nạp/đăng ký bằng thao tác người dùng; chưa kiểm thử trong Chrome đã cài.
 Android: **AniSub cho TV** có giọng thuyết minh AI chạy ngay trên máy (sherpa-onnx + giọng Piper
 `vi_VN-vais1000-medium`), tải gói giọng lần đầu khi người dùng đồng ý, kiểm tra SHA-256, sau đó
-chạy offline; giao thức Messenger major 1 / minor 1 với AniBox cùng chữ ký. Số đo trên P650
+chạy offline; giao thức Messenger major 1 / minor 2 với AniBox cùng chữ ký. Từ 0.3.0: phụ đề khác
+ngôn ngữ giọng đọc được dịch ngay trên TV (ML Kit Translate, tải mô hình khi đồng ý) và có thêm giọng
+tiếng Anh `en_US-ljspeech-medium` (gói `voices-en-v1`, chờ phát hành). Số đo trên P650
 đang chờ kiểm thử phần cứng. Mã nguồn công khai: https://github.com/LongLeo287/AniSub (GPL-3.0-or-later).
 [Cách dùng video ở ứng dụng riêng](docs/external-desktop.md), [kiểm chứng](docs/full-desktop-validation.md).
 [Trạng thái Android và cách kiểm thử](apps/android/README.md).

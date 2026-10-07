@@ -36,6 +36,44 @@ Host measurements (Windows x86-64 desktop, NOT TV evidence): native load 0.6-1.1
 0.067-0.076 (1 thread) / 0.042-0.056 (2 threads), first PCM p50 135-197 ms for <=200-character
 cues. Emulator and P650 numbers are pending; the app uses 2 inference threads on 4-core devices.
 
+## en-ljspeech-medium, version 1 (release tag `voices-en-v1`, ANISUB-004)
+
+| Item | Value |
+|---|---|
+| Voice | Piper `en_US-ljspeech-medium`, single speaker (female, US English), 22,050 Hz, VITS, espeak voice `en` |
+| Engine | sherpa-onnx 1.13.8, same as the Vietnamese pack |
+| Source | `https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-ljspeech-medium.tar.bz2` (sha256 `3dfb4b759d8be032a4903a9538d128b0fda2a06ab1de6cbc2d93a97e2dd83dba`) |
+| Download | 11 files, 64,400,101 bytes (model 63,531,507) |
+| Model license | MIT (rhasspy/piper-voices repository) |
+| Training data | LJ Speech Dataset — public domain (https://keithito.com/LJ-Speech-Dataset/); trained **from scratch** by Bryce Beattie (MODEL_CARD), so no Lessac/Blizzard lineage |
+| Phonemizer data | the SAME 8 espeak-ng-data files as `voices-v1`, byte-identical (SHA-256 equal) |
+
+Why this voice: `en_US-lessac-*` uses the research-only Blizzard 2013 Lessac data; `amy` and
+`libritts_r` are fine-tuned from lessac; `hfc_*` is CC BY-NC-SA. `ljspeech` (public domain data,
+trained from scratch) is the most permissive medium-quality US English voice; `kristin` (LibriVox,
+public domain) is the alternative.
+
+Shared espeak data: sherpa-onnx initialises espeak-ng once per process with the first data path.
+The app therefore copies the verified espeak files of a pack into one app-owned directory
+(`files/espeak-ng-data`, `EspeakData`) and always passes that; both packs ship the same files, so
+either pack serves both languages and deleting/updating a pack never pulls the data from under the
+engine. Emulator check: vi then en, and en then vi, in one process (both orders) speak correctly.
+
+Emulator (x86, NOT P650): en pack install from the staged files (verify + atomic install + native
+smoke test "Hello.") 1.5 s; engine load 1.1 s; RTF 0.074-0.078 with 2 threads.
+
+## Publishing `voices-en-v1` (owner/root) — PENDING, nothing uploaded
+
+```powershell
+# Staged already (git-ignored): dist/voices-en-v1/ljspeech-* (11 files). To rebuild them:
+node apps/android/tools/build-voice-pack.mjs <dir>/vits-piper-en_US-ljspeech-medium dist/voices-en-v1 --pack en --catalog apps/android/app/src/main/assets/voice-catalog.json
+gh release create voices-en-v1 --repo LongLeo287/AniSub --title "Voice packs: English v1" --notes "Piper en_US-ljspeech-medium for AniSub (see docs/voices.md)" dist/voices-en-v1/ljspeech-*
+```
+
+Upload exactly the 11 `ljspeech-*` files (list, sizes and SHA-256 in `dist/voices-en-v1/PUBLISH-PENDING.md`
+and pinned in `assets/voice-catalog.json`). Until they are uploaded the English download in AniSub
+0.3.0 fails with NETWORK (HTTP 404) and the Vietnamese pack is unaffected.
+
 ## Publishing `voices-v1` (owner/root)
 
 ```powershell

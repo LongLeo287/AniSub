@@ -1,8 +1,9 @@
 # AniSub Android addon contract — AniBox handoff
 
 Date: 2026-10-07. Owner: AniSub runtime (Claude, reassigned by the owner 07-10: "Làm full AniSub
-rồi tích hợp vào AniBox"). **Shipping contract: protocol major 1, minor 1** (additive to the
-earlier private major 1 test). The major 2 draft further below is FUTURE work, not implemented.
+rồi tích hợp vào AniBox"). **Shipping contract: protocol major 1, minor 2** (minor 2 = ANISUB-004,
+section 3b; additive to minor 1 and to the earlier private major 1 test). The major 2 draft further
+below is FUTURE work, not implemented.
 See [System Design](superpowers/specs/2026-10-07-anisub-runtime-design.md).
 
 ## 1. Transport and caller trust (unchanged wire, new trust rule)
@@ -30,12 +31,13 @@ See [System Design](superpowers/specs/2026-10-07-anisub-runtime-design.md).
 
 | Field | Type | Meaning |
 |---|---|---|
-| `type`, `major`, `minor`, `protocolMajor` | "CAPABILITIES", 1, 1, 1 | `minor:1` = this contract |
+| `type`, `major`, `minor`, `protocolMajor` | "CAPABILITIES", 1, 2, 1 | `minor:2` since AniSub 0.3.0 (section 3b adds `voices`, `translate`, `timeline`) |
 | `directText` | true | direct subtitle text input only |
 | `tts` | bool | a local offline Vietnamese **system** voice is installed (mode "system") |
 | `offline` | bool | `tts` or `aiVoice` |
-| `aiVoice` | bool | true ONLY when a verified voice pack is installed and READY |
-| `translation`, `multiSpeaker` | false | not offered |
+| `aiVoice` | bool | true ONLY when the verified **Vietnamese** pack is installed and READY (minor-1 meaning) |
+| `translation` | bool | minor 2: `translate.available` (was always false) |
+| `multiSpeaker` | false | not offered |
 | `engine`, `state` | "android-system-tts", string | legacy system-voice fields, kept |
 | `voicePack.state` | NONE / DOWNLOADING / VERIFYING / READY / ERROR | pack lifecycle |
 | `voicePack.id`, `name`, `version` | string | installed pack, or the catalog pack that would be downloaded |
@@ -67,8 +69,9 @@ Session commands still need `session`, `revision`, `seq`, `positionMs`, `speed`,
 
 - mode "system": `systemTest:true`, language `vi` and an installed offline Vietnamese system
   voice, else `UNAVAILABLE`. `rate`/`voice` are ignored in this mode.
-- mode "ai": language `vi` (else `UNSUPPORTED`) and `voicePack.state=="READY"`, else ERROR
-  **`VOICE_PACK_MISSING`**. There is never a fallback from AI to the system voice.
+- mode "ai": the `voiceLang` pack (minor 2; Vietnamese when absent) must be READY, else ERROR
+  **`VOICE_PACK_MISSING`**; a `language` other than the voice language is translated (section 3b;
+  minor 1 answered `UNSUPPORTED` there). There is never a fallback from AI to the system voice.
 - OPEN ai starts loading the engine asynchronously (full SHA-256 re-verification, native load,
   warm-up: about 1 s on a desktop CPU; P650 pending). Cues received meanwhile queue (max 8);
   known-expired ones are reported `EXPIRED`. If loading fails, queued cues get ERROR
@@ -91,10 +94,101 @@ auto-adjusted within x1.00-x1.15 of the user rate (never slower than it); unknow
 rate. Watchdogs: 10 s without progress inside the pipeline, plus a per-cue cap (expected duration
 x2 + 15 s, at most 120 s).
 
+## 3b. Minor 2 — translation into the voice language (ANISUB-004, AniSub 0.3.0)
+
+Owner 07-10-2026: AI Thuyết minh always reads a **softsub** (text subtitle). AniBox fetches one in
+the voice language first, else English, then Japanese, then others; AniSub translates it on the TV
+(Google ML Kit Translate) into the **voice language** (`vi` default, or `en`) and speaks it. Pairs
+that matter: en->vi, ja->vi, vi->en, ja->en (others are best-effort). Everything is additive: a
+minor-1 client (no `voiceLang`, `language:"vi"`) gets exactly the 1.1 behaviour.
+
+**CAPABILITIES additions** (fixture: `tests/fixtures/android-v1/capabilities-minor2.json`, schema:
+`protocol/schema/android-v1.schema.json`):
+
+| Field | Type | Meaning |
+|---|---|---|
+| `minor` | 2 | |
+| `voices` | `{"vi":V,"en":V}` | one entry per voice language |
+| `voices.<lang>.state` | `"ready"` / `"missing"` / `"downloading"` | verified pack installed / not installed (or failed) / downloading or verifying |
+| `voices.<lang>.id`, `version`, `sizeBytes` | string, string, number | catalog pack (`vi-vais1000-medium` 64,017,617 B; `en-ljspeech-medium` 64,400,101 B) |
+| `voices.<lang>.doneBytes` | number | only while downloading (not a re-send trigger) |
+| `voices.<lang>.error` | string | last failure: NO_SPACE / NETWORK / CORRUPT / INCOMPATIBLE / STORAGE / IN_USE |
+| `voices.<lang>.voices` | `[{id,name}]` | voices of a READY pack (vi: `vais1000`, en: `ljspeech`) |
+| `translate.engine` | `"mlkit"` | |
+| `translate.available` | bool | the engine can run here (it needs Android's system DownloadManager to fetch models; NOT Google Play services) |
+| `translate.reason` | string | only when unavailable: `NO_DOWNLOAD_MANAGER` / `NATIVE_UNAVAILABLE` |
+| `translate.detect` | bool | on-device language identification for `"und"` |
+| `translate.models` | `{lang: state}` | `"ready"` / `"missing"` / `"downloading"` for vi, en (always ready, built in), ja, zh, ko, th, id, ms, es, fr, de, pt, it, ru, ar, hi, plus any other installed model |
+| `translate.lookaheadMs` | 90000 | pre-translation window (media time) |
+| `timeline` | `{maxCues:4096, maxTextUnits:1048576}` | per-session store for cues sent ahead |
+
+CAPABILITIES is re-sent when a pack, model or engine state changes.
+
+**OPEN additions:**
+
+| Field | Rule |
+|---|---|
+| `voiceLang` | `"vi"` (default when absent or null) or `"en"`; other strings -> `UNSUPPORTED` (+`voiceLang`); non-string -> `MALFORMED`. Mode `"system"` stays Vietnamese: `voiceLang:"en"` there -> `UNSUPPORTED` |
+| `language` | the cue SOURCE language, BCP-47 (`ja`, `en-US`, `zh-Hant`, `pt-BR` ...) or `"und"`; an invalid tag -> `MALFORMED`. Mapped to ML Kit codes (`zh-*` -> zh, `iw` -> he, `in` -> id, `fil` -> tl, `nb`/`nn` -> no) |
+| `voice` | must be a voice of the `voiceLang` pack, else `UNSUPPORTED` |
+
+Admission (mode `"ai"`), in order; a refused OPEN gets an ERROR whose extra fields sit next to
+`type`/`major`/`code`/`session`/`revision`:
+
+1. `voiceLang` pack not READY -> **`VOICE_PACK_MISSING`** `{voiceLang}`.
+2. source == voiceLang (`vi`+`vi`, `en`+`en`) -> accepted, no translation.
+3. engine unavailable -> **`TRANSLATE_UNAVAILABLE`** `{voiceLang, reason, language?}`.
+4. source not an ML Kit language -> **`TRANSLATE_UNAVAILABLE`** `{voiceLang, language, reason:"UNSUPPORTED_LANGUAGE"}`.
+5. a needed model is not installed -> **`TRANSLATE_MODEL_MISSING`** `{language: first missing, from, to, voiceLang, missing:[...]}`.
+   ML Kit pivots through English: en->vi needs `vi`; ja->vi needs `ja`+`vi`; vi->en needs `vi`; ja->en needs `ja`.
+   The user downloads models in AniSub settings (consent dialog); AniBox can open them with the
+   `com.anisub.runtime.action.SETTINGS` intent.
+6. `"und"`: with language identification the target model must already be installed (else step 5
+   with `from:"und"`); AniSub identifies the language from the first cues (<= 6 cues / 300
+   characters, or 1.5 s after the first cue) and sends **`LANGUAGE_DETECTED`** `{session, revision,
+   language, assumed}`. Without identification (or when it cannot tell) English is assumed
+   (`assumed:true`). If the detected language then lacks a model, one session-level ERROR
+   `TRANSLATE_MODEL_MISSING` / `TRANSLATE_UNAVAILABLE` (same fields) follows and the cues fail with it.
+
+Translation failures during a session are per cue: ERROR `{code, cueId}` with
+`TRANSLATE_MODEL_MISSING` / `TRANSLATE_UNAVAILABLE` (fatal for the pair: every pending cue fails at
+once) or `PROVIDER_FAILED` (that cue only). There is never a silent fallback to reading the
+untranslated text or to the system voice. After a refused OPEN, CUES for that session get `STALE`.
+
+**Cues ahead of time (the whole external subtitle file):**
+
+- CUES limits are unchanged (<= 16 cues/message, text <= 512, ids <= 80): send the file in batches.
+- A cue that starts more than 5 s after the current media time no longer gets `OUTSIDE_HORIZON`: it
+  goes into the session **timeline** (<= 4096 cues, <= 1,048,576 text units; beyond that ->
+  `BACKPRESSURE` per cue; a duplicate id is ignored).
+- Optional `"timeline": true` on a CUES message marks a file batch: every cue goes to the timeline,
+  cues already over are kept (for seeking back) but skipped silently, and an EMPTY timeline batch
+  clears nothing. Recommended for file batches. Without the flag an empty CUES still clears pending
+  active-snapshot cues (never timeline cues).
+- The timeline survives SEEK / PAUSE / PLAY / revision changes (eligibility restarts at the new
+  position; cues that end before it are skipped silently; cues that come due while playing and are
+  missed get `EXPIRED`). OPEN, CLOSE, EPISODE_CHANGE and SOURCE_CHANGE clear it and the translations;
+  after EPISODE/SOURCE_CHANGE the OPEN's language pair stays in force (`und` is detected again).
+- Every 500 ms while a session runs, AniSub moves due cues (start within 5 s) into the speech queue
+  and pre-translates the cues of the next 90 s of media time in the background (one translation at
+  a time, never on the main thread; results kept per cue plus a bounded per-session cache: 512 cues,
+  1024 lines). A cue about to be spoken whose translation is not ready is translated first; its
+  speech starts once ready (never untranslated).
+- Cue text is cleaned before translating and speaking in AI mode: ASS override blocks (`{\an8}`),
+  ASS drawings, `\N` / `\n` / `\h`, HTML tags and line breaks become plain text with single spaces.
+
+Measured on the AniBox_P650 emulator (x86, Android TV 11; NOT P650 hardware): ML Kit en->vi cold
+309 ms, then 45-95 ms per cue (mean 69 ms); ja->vi mean 144 ms (max 240); vi->en mean 69 ms; ja->en
+mean 80 ms. Whole-file sessions through the real service (timeline cues sent before PLAY): en->vi
+20/20 cues STARTED within 9 ms of the cue start; `und` (Japanese lines) -> `LANGUAGE_DETECTED ja`
+-> vi 10/10 within 12 ms; vi->en with the English voice 10/10 within 9 ms.
+
 ## 4. Settings screen (launch from AniBox)
 
 `new Intent("com.anisub.runtime.action.SETTINGS").setPackage("com.anisub.runtime")` opens the TV
-settings: pack status, Download (consent dialog with size + license) / Cancel / Update / Delete,
+settings: a Vietnamese and an English voice section (each: status, Download with a consent dialog
+showing size + license / Cancel / Update / Delete, "Nghe thử"), the ML Kit translation section
+(model list: consent download showing the size and that it comes from Google, delete; "Dịch thử"),
 voice choice when a pack has several voices, speech rate (0.8-1.3, used when OPEN omits `rate`),
 "Nghe thử" preview, AniBox compatibility line and about/licenses. It is exported without a
 permission on purpose (same install-order reason); it exposes no data and acts only on on-screen

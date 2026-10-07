@@ -286,8 +286,8 @@ public final class SettingsActivity extends Activity {
         if (tr.lastDownloadError() != null) st += "\nLần tải trước lỗi: " + downloadError(tr.lastDownloadError());
         st += "\nCần mô hình Tiếng Việt để dịch sang giọng Việt; phụ đề tiếng Nhật cần thêm mô hình Tiếng Nhật.";
         trStatus.set("Dịch phụ đề trên TV", st, false, true);
-        trModels.set("Mô hình dịch", "Tải hoặc xóa mô hình từng ngôn ngữ (khoảng 30 MB mỗi ngôn ngữ).", !host.sessionActive(), true);
-        boolean canTrial = tr.modelReady(LanguageTags.VI) && !host.sessionActive() && !trialRunning;
+        trModels.set("Mô hình dịch", "Tải hoặc xóa mô hình từng ngôn ngữ (tải khoảng 30 MB, chiếm 45–65 MB mỗi ngôn ngữ).", !host.sessionActive(), true);
+        boolean canTrial = tr.modelReady(LanguageTags.VI) && !host.sessionActive(); // stays focusable while running (onTrial ignores repeats)
         String tv;
         if (trialRunning) tv = "Đang dịch…";
         else if (trialResult != null) tv = trialResult;
@@ -426,8 +426,8 @@ public final class SettingsActivity extends Activity {
                     () -> tr.delete(lang, ok -> runOnUiThread(this::render)));
             return;
         }
-        String message = "Mô hình dịch " + name + ", khoảng " + VoicePackManager.formatBytes(MlKitTranslation.APPROX_MODEL_BYTES)
-                + ".\n\nTải từ máy chủ của Google (ML Kit Translate, phần mềm đóng của Google, theo Điều khoản ML Kit). "
+        String message = "Mô hình dịch " + name + ": tải khoảng " + VoicePackManager.formatBytes(MlKitTranslation.APPROX_MODEL_BYTES)
+                + ", chiếm tối đa khoảng " + VoicePackManager.formatBytes(MlKitTranslation.APPROX_INSTALLED_BYTES) + " trên TV.\n\nTải từ máy chủ của Google (ML Kit Translate, phần mềm đóng của Google, theo Điều khoản ML Kit). "
                 + "Việc tải dùng trình tải xuống của hệ thống Android. Sau khi tải, việc dịch chạy hoàn toàn trên TV; "
                 + "phụ đề không gửi đi đâu. Có thể xóa mô hình bất cứ lúc nào.";
         confirm("Tải mô hình dịch " + name + "?", message, "Đồng ý tải",

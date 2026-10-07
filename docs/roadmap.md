@@ -1,5 +1,11 @@
 # AniSub roadmap
 
+2026-10-07 ANISUB-004 ([task](tasks/ANISUB-004.md)): protocol **major 1 / minor 2** — softsub
+translated on the TV (ML Kit Translate, consented models) into the voice language (vi/en), English
+Piper voice pack `en-ljspeech-medium` (release `voices-en-v1` staged, not published), cues sent ahead
+as a timeline with 90 s lookahead pre-translation. Evidence: 105 JUnit, gate 4,296, Node 34, lint
+clean, emulator sessions on time (see apps/android/README.md). P650 hardware pending.
+
 2026-10-07 ANISUB-AI-001 (owner reassigned AniSub to Claude; [task](tasks/ANISUB-AI-001.md)):
 Android on-device AI narration implemented as the shipping **major 1 / minor 1** contract
 (sherpa-onnx 1.13.8 + Piper `vi_VN-vais1000-medium`, consented verified voice-pack download,

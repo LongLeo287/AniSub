@@ -45,6 +45,8 @@ import java.util.concurrent.Executors;
 public final class MlKitTranslation implements TranslationScheduler.Translator {
     /** ML Kit documents "about 30 MB" per translation model; shown in the consent dialog. */
     public static final long APPROX_MODEL_BYTES = 30_000_000L;
+    /** Measured on the AniBox_P650 emulator 07-10-2026: en_vi 45.9 MB, en_ja 63.6 MB once installed. */
+    public static final long APPROX_INSTALLED_BYTES = 65_000_000L;
     public static final String NO_DOWNLOAD_MANAGER = "NO_DOWNLOAD_MANAGER", NATIVE_UNAVAILABLE = "NATIVE_UNAVAILABLE";
 
     public interface IdentifyCallback { void done(String language, boolean assumed); }
@@ -203,6 +205,9 @@ public final class MlKitTranslation implements TranslationScheduler.Translator {
                             .addOnCompleteListener(task -> {
                                 synchronized (MlKitTranslation.this) { if (task.isSuccessful()) downloaded.remove(lang); }
                                 persist();
+                                // ML Kit 17.0.3 reports the model gone but leaves part of its files (35 MB of
+                                // en_vi + en_ja seen on the emulator): free the space the user asked to free.
+                                if (task.isSuccessful()) work.execute(() -> removeLeftovers(lang));
                                 changed.run();
                                 refresh();
                                 if (done != null) done.done(task.isSuccessful());
@@ -210,6 +215,21 @@ public final class MlKitTranslation implements TranslationScheduler.Translator {
                 } catch (RuntimeException e) { if (done != null) done.done(false); }
             });
         });
+    }
+
+    /** Deletes what ML Kit left of a deleted model (AniSub's private no-backup storage only). Worker thread. */
+    private void removeLeftovers(String lang) {
+        if (!LanguageTags.translatable(lang) || LanguageTags.EN.equals(lang)) return;
+        java.io.File root = new java.io.File(app.getNoBackupFilesDir(), "com.google.mlkit.translate.models");
+        deleteTree(new java.io.File(root, "en_" + lang), 0);
+    }
+
+    private static void deleteTree(java.io.File f, int depth) {
+        if (depth > 8 || !f.exists()) return;
+        java.io.File[] children = f.isDirectory() ? f.listFiles() : null;
+        if (children != null) for (java.io.File c : children) deleteTree(c, depth + 1);
+        //noinspection ResultOfMethodCallIgnored
+        f.delete();
     }
 
     /** TranslationScheduler port. Main thread; the callback arrives on the main looper. */

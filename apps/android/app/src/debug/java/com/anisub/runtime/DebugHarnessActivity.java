@@ -62,6 +62,21 @@ public final class DebugHarnessActivity extends Activity {
             "He's been gone for three years.",
             "{\\an8}Don't give up now,\\Nwe're almost there.",
     };
+    static final String[] SAMPLES_JA = {
+            "どこへ行くの？", "嵐が村に来る前に出発しなければならない。", "言っただろう、彼なんか怖くない。",
+            "命を救ってくれてありがとう。", "城の門は夜明けに開く。", "この戦いに負けたら、すべてが終わりだ。",
+            "聞こえるか？しっかりしろ！", "何があっても、君を守る。", "あんなに強い魔法は初めて見た。",
+            "まず食べよう、話はそれからだ。", "彼がいなくなって三年になる。", "今あきらめるな、もうすぐだ。",
+    };
+    static final String[] SAMPLES_VI = {
+            "Cậu định đi đâu vậy?", "Chúng ta phải rời đi trước khi bão đến làng.", "Tớ đã nói rồi, tớ không sợ hắn.",
+            "Cảm ơn vì đã cứu mạng tôi.", "Cổng lâu đài mở lúc bình minh.", "Nếu thua trận này, mọi thứ sẽ chấm dứt.",
+            "Nghe thấy tôi không? Cố lên!", "Dù có chuyện gì, tôi cũng sẽ bảo vệ cậu.", "Đó là phép thuật mạnh nhất tôi từng thấy.",
+            "Ăn trước đã, rồi nói chuyện sau.", "Anh ấy đã đi được ba năm rồi.", "Đừng bỏ cuộc lúc này, sắp tới nơi rồi.",
+    };
+    /** Sample lines written in {@code lang} (English for anything else). */
+    static String[] samples(String lang) { return "ja".equals(lang) ? SAMPLES_JA : "vi".equals(lang) ? SAMPLES_VI : SAMPLES; }
+    private String[] lines = SAMPLES;
     private final Handler main = new Handler(Looper.getMainLooper());
     private RuntimeHost host;
     private TextView out;
@@ -80,6 +95,7 @@ public final class DebugHarnessActivity extends Activity {
 
     private void run(Intent intent) {
         String cmd = intent.getStringExtra("cmd");
+        lines = samples(arg(intent, "samples", arg(intent, "from", "en")));
         log("cmd=" + cmd);
         if (cmd == null) cmd = "status";
         try {
@@ -89,7 +105,7 @@ public final class DebugHarnessActivity extends Activity {
                 case "mlkit-download": mlkitDownload(arg(intent, "lang", "vi")); break;
                 case "translate": translateSamples(arg(intent, "from", "en"), arg(intent, "to", "vi")); break;
                 case "speak": speak(arg(intent, "lang", "vi"), intent.getStringExtra("text")); break;
-                case "session": session(arg(intent, "from", "en"), arg(intent, "to", "vi"), intent.getIntExtra("cues", 20)); break;
+                case "session": timelineFlag = intent.getBooleanExtra("timeline", true); session(arg(intent, "from", "en"), arg(intent, "to", "vi"), intent.getIntExtra("cues", 20)); break;
                 case "cleanup": cleanup(); break;
                 default: log("unknown cmd");
             }
@@ -145,19 +161,19 @@ public final class DebugHarnessActivity extends Activity {
         next[0] = (result, error) -> {
             long ms = SystemClock.elapsedRealtime() - t0[0];
             times.add(ms);
-            int k = i[0] % SAMPLES.length;
+            int k = i[0] % lines.length;
             log(String.format(Locale.ROOT, "translate %s>%s #%d %d ms: \"%s\" -> \"%s\"%s", from, to, i[0], ms,
-                    TextCleaner.clean(SAMPLES[k]), result, error == null ? "" : " error=" + error));
+                    TextCleaner.clean(lines[k]), result, error == null ? "" : " error=" + error));
             i[0]++;
-            if (i[0] < SAMPLES.length * 2 && error == null) {
+            if (i[0] < lines.length * 2 && error == null) {
                 t0[0] = SystemClock.elapsedRealtime();
-                tr.translate(TextCleaner.clean(SAMPLES[i[0] % SAMPLES.length]), from, to, next[0]);
+                tr.translate(TextCleaner.clean(lines[i[0] % lines.length]), from, to, next[0]);
             } else {
                 long sum = 0, max = 0; for (int j = 1; j < times.size(); j++) { sum += times.get(j); max = Math.max(max, times.get(j)); }
                 log("translate summary: first(cold)=" + times.get(0) + " ms, warm mean=" + (times.size() > 1 ? sum / (times.size() - 1) : 0) + " ms, warm max=" + max + " ms, n=" + times.size());
             }
         };
-        tr.translate(TextCleaner.clean(SAMPLES[0]), from, to, next[0]);
+        tr.translate(TextCleaner.clean(lines[0]), from, to, next[0]);
     }
 
     private String speakId;
@@ -192,6 +208,8 @@ public final class DebugHarnessActivity extends Activity {
     private final Map<String, Long> startedLate = new HashMap<>();
     private int finished, errors;
     private String sessionId;
+    /** false: plain CUES (no timeline flag); cues beyond the 5 s horizon must still be kept. */
+    private boolean timelineFlag = true;
 
     /**
      * Binds AniSubService (debug trust: own uid), OPENs an AI session {language: from, voiceLang: to},
@@ -232,9 +250,11 @@ public final class DebugHarnessActivity extends Activity {
                         long start = 8000 + 3000L * i;
                         String id = "c" + i;
                         cueStart.put(id, start);
-                        batch.put(new JSONObject().put("id", id).put("text", SAMPLES[i % SAMPLES.length]).put("startMs", start).put("endMs", start + 2500).put("role", "dialogue"));
+                        batch.put(new JSONObject().put("id", id).put("text", lines[i % lines.length]).put("startMs", start).put("endMs", start + 2500).put("role", "dialogue"));
                         if (batch.length() == 16 || i == count - 1) {
-                            send(replies, cmd("CUES", from, 0).put("timeline", true).put("cues", batch));
+                            JSONObject cues = cmd("CUES", from, 0).put("cues", batch);
+                            if (timelineFlag) cues.put("timeline", true);
+                            send(replies, cues);
                             batch = new JSONArray();
                         }
                     }
@@ -280,8 +300,9 @@ public final class DebugHarnessActivity extends Activity {
         final VoicePackManager en = host.voices(LanguageTags.EN);
         Runnable remove = () -> { String e = en == null ? null : en.delete(); main.post(() -> log("en pack delete -> " + (e == null ? "ok" : e))); };
         if (host.engine() != null) host.engine().unloadThen(remove); else remove.run();
+        File mlkit = new File(getNoBackupFilesDir(), "com.google.mlkit.translate.models");
         for (String lang : host.translation().models().keySet()) {
-            if (!LanguageTags.EN.equals(lang) && host.translation().modelReady(lang))
+            if (!LanguageTags.EN.equals(lang) && (host.translation().modelReady(lang) || new File(mlkit, "en_" + lang).exists()))
                 host.translation().delete(lang, ok -> log("mlkit delete " + lang + " ok=" + ok));
         }
         File dir = new File(getFilesDir(), "debug-packs");

@@ -46,6 +46,9 @@ public final class AniSubService extends Service {
     private String voiceLang = LanguageTags.VI;
     /** Translation for this session: on, the source ("und" until detected) and a fatal failure code. */
     private boolean translating;
+    /** The OPEN decision's translation setting, restored when the content changes (EPISODE/SOURCE_CHANGE). */
+    private boolean openTranslate;
+    private String openSource = LanguageTags.VI;
     private String translateFailure;
     private JSONObject translateFailureDetail;
     private boolean detecting, detectRequested;
@@ -166,10 +169,12 @@ public final class AniSubService extends Service {
             }
             List<Job> incoming = "CUES".equals(type) ? parseCues(input, id, rev, language) : Collections.<Job>emptyList();
             if (!gate.accept(type, id, rev, seq)) { error("STALE", null); return; }
+            // The system-voice test stays Vietnamese-only; AI mode accepts any source language (minor 2).
+            if ("CUES".equals(type) && Objects.equals(session, id) && !OpenRules.MODE_AI.equals(mode) && !"vi".equals(language)) throw new JSONException("cue language");
             boolean newSession = "OPEN".equals(type) || !Objects.equals(session, id);
             if (newSession || rev != revision) {
                 cancel(); seen.clear();
-                if (newSession) resetContent(); else timeline.restart(pos);
+                if (newSession) { openTranslate = false; resetContent(); } else timeline.restart(pos);
             }
             session = id; revision = rev; position = pos; speed = rate; anchor = SystemClock.elapsedRealtime();
             if ("CUES".equals(type)) {
@@ -194,9 +199,8 @@ public final class AniSubService extends Service {
                 boolean ai = OpenRules.MODE_AI.equals(mode);
                 host.setSessionActive(ai);
                 if (ai) {
-                    translating = decision.translate;
-                    if (translating) scheduler.reset(decision.source, voiceLang);
-                    detecting = translating && LanguageTags.UND.equals(decision.source);
+                    openTranslate = decision.translate; openSource = decision.source;
+                    resetContent();
                     host.engine().setLanguage(voiceLang);
                     host.engine().setVoice(decision.voiceId != null ? decision.voiceId : host.defaultVoice());
                     host.engine().load();
@@ -208,7 +212,7 @@ public final class AniSubService extends Service {
                 if ("PAUSE".equals(type) || "STOP".equals(type) || "CLOSE".equals(type)
                         || "EPISODE_CHANGE".equals(type) || "SOURCE_CHANGE".equals(type)) playing = false;
                 if ("EPISODE_CHANGE".equals(type) || "SOURCE_CHANGE".equals(type)) resetContent();
-                if ("CLOSE".equals(type)) { resetContent(); session = null; endAiSession(); }
+                if ("CLOSE".equals(type)) { openTranslate = false; resetContent(); session = null; endAiSession(); }
             }
             scheduleTick();
             drain();
@@ -217,11 +221,17 @@ public final class AniSubService extends Service {
         }
     }
 
-    /** New session/content: timeline, translations and detection start over. */
+    /**
+     * New session or new content (episode/source): timeline, translations and detection start over
+     * with the OPEN decision's pair ("und" is detected again for the new content).
+     */
     private void resetContent() {
-        timeline.clear(); scheduler.clear();
-        translating = false; translateFailure = null; translateFailureDetail = null;
-        detecting = false; detectRequested = false; detectText.setLength(0); detectCues = 0; detectGeneration++;
+        timeline.clear();
+        translating = openTranslate;
+        if (translating) scheduler.reset(openSource, voiceLang); else scheduler.clear();
+        translateFailure = null; translateFailureDetail = null;
+        detecting = translating && LanguageTags.UND.equals(openSource);
+        detectRequested = false; detectText.setLength(0); detectCues = 0; detectGeneration++;
         handler.removeCallbacks(detectTimeout);
     }
 
@@ -249,8 +259,7 @@ public final class AniSubService extends Service {
     }
     private List<Job> parseCues(JSONObject input, String id, long rev, String language) throws JSONException {
         JSONArray cues = input.getJSONArray("cues");
-        // The system-voice test stays Vietnamese-only; AI mode accepts any source language (minor 2).
-        if (cues.length() > 16 || (!OpenRules.MODE_AI.equals(mode) && !"vi".equals(language))) throw new JSONException("cue bounds");
+        if (cues.length() > 16) throw new JSONException("cue bounds");
         List<Job> jobs = new ArrayList<>();
         Set<String> ids = new HashSet<>();
         for (int i = 0; i < cues.length(); i++) {
@@ -485,6 +494,7 @@ public final class AniSubService extends Service {
     }
     private void disconnect() {
         if (engine != null) cancel(); gate.closeCurrent(); session = null; playing = false; seen.clear();
+        openTranslate = false;
         if (scheduler != null) resetContent();
         handler.removeCallbacks(tick);
         if (host != null) endAiSession();
