@@ -23,6 +23,8 @@ import java.util.concurrent.Executor;
  */
 public final class TranslationScheduler {
     public static final long LOOKAHEAD_MS = 90_000;
+    /** A translation that has not answered by then fails with PROVIDER_FAILED (its late result is ignored). */
+    public static final long TIMEOUT_MS = 10_000;
     public static final int MAX_IN_FLIGHT = 1, MAX_ITEMS = 512, CACHE_ENTRIES = 1024, CACHE_UNITS = 256 * 1024;
     public static final String E_MODEL_MISSING = "TRANSLATE_MODEL_MISSING", E_UNAVAILABLE = "TRANSLATE_UNAVAILABLE",
             E_FAILED = "PROVIDER_FAILED";
@@ -32,16 +34,21 @@ public final class TranslationScheduler {
     /** Exactly one of result / errorCode is non-null. May be called on any thread. */
     public interface Callback { void done(String result, String errorCode); }
     public interface Listener { void translated(String cueId); void failed(String cueId, String code); }
+    /** Runs {@code task} on the scheduler's thread after {@code delayMs}; the returned runnable cancels it. */
+    public interface Delay { Runnable schedule(Runnable task, long delayMs); }
 
     private enum State { PENDING, RUNNING, DONE, FAILED }
     private static final class Item {
         final String id, text; final long start; boolean urgent; State state = State.PENDING; String result, error;
+        long token; Runnable cancelTimeout;
         Item(String id, String text, long start, boolean urgent) { this.id = id; this.text = text; this.start = start; this.urgent = urgent; }
     }
 
     private final Translator translator;
     private final Executor deliver;
     private final Listener listener;
+    private final Delay delay;
+    private long tokens;
     private final LinkedHashMap<String, Item> items = new LinkedHashMap<>();
     private final LinkedHashMap<String, String> cache = new LinkedHashMap<>(64, 0.75f, true);
     private long cacheUnits;
@@ -51,9 +58,15 @@ public final class TranslationScheduler {
     // Diagnostics only (counts and timings, never text).
     private long requests, translated, cacheHits, failures, totalNanos, maxNanos;
 
+    /** Without timeouts (tests of ordering/caching). */
     public TranslationScheduler(Translator translator, Executor deliver, Listener listener) {
+        this(translator, deliver, null, listener);
+    }
+
+    /** @param delay timeout timer on the scheduler's thread; null = no timeouts */
+    public TranslationScheduler(Translator translator, Executor deliver, Delay delay, Listener listener) {
         if (translator == null || deliver == null || listener == null) throw new IllegalArgumentException("ports");
-        this.translator = translator; this.deliver = deliver; this.listener = listener;
+        this.translator = translator; this.deliver = deliver; this.delay = delay; this.listener = listener;
     }
 
     /** New session or pair: everything is dropped; {@code from} may be "und" (waits for {@link #setSource}). */
@@ -143,17 +156,21 @@ public final class TranslationScheduler {
             String hit = cache.get(cacheKey(next.text));
             if (hit != null) { next.state = State.DONE; next.result = hit; cacheHits++; listener.translated(next.id); continue; }
             final Item job = next; final long gen = generation; final long t0 = System.nanoTime();
-            job.state = State.RUNNING; running++;
+            final long token = ++tokens;
+            job.state = State.RUNNING; job.token = token; running++;
+            if (delay != null) job.cancelTimeout = delay.schedule(() -> complete(job, gen, token, t0, null, E_FAILED), TIMEOUT_MS);
             try {
-                translator.translate(job.text, from, to, (result, error) -> deliver.execute(() -> complete(job, gen, t0, result, error)));
+                translator.translate(job.text, from, to, (result, error) -> deliver.execute(() -> complete(job, gen, token, t0, result, error)));
             } catch (RuntimeException e) {
-                complete(job, gen, t0, null, E_FAILED);
+                complete(job, gen, token, t0, null, E_FAILED);
             }
         }
     }
 
-    private void complete(Item job, long gen, long t0, String result, String error) {
+    private void complete(Item job, long gen, long token, long t0, String result, String error) {
         if (gen != generation) return; // reset/setSource since: discarded, the counter was reset
+        if (job.state != State.RUNNING || job.token != token) return; // timed out already, or a late answer
+        if (job.cancelTimeout != null) { job.cancelTimeout.run(); job.cancelTimeout = null; }
         running--;
         long took = System.nanoTime() - t0;
         if (items.get(job.id) != job) { pump(); return; } // forgotten meanwhile

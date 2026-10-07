@@ -169,4 +169,43 @@ public class TranslationSchedulerTest {
         assertTrue(fake.requests.isEmpty());
         assertFalse(s.known("a"));
     }
+
+    /** Fake timer: the test fires due tasks by advancing time. */
+    static final class FakeDelay implements TranslationScheduler.Delay {
+        final List<long[]> at = new ArrayList<>(); final List<Runnable> tasks = new ArrayList<>(); long now;
+        public Runnable schedule(Runnable task, long delayMs) {
+            final int i = tasks.size(); tasks.add(task); at.add(new long[]{now + delayMs});
+            return () -> tasks.set(i, null);
+        }
+        void advance(long ms) {
+            now += ms;
+            for (int i = 0; i < tasks.size(); i++) if (tasks.get(i) != null && at.get(i)[0] <= now) { Runnable r = tasks.get(i); tasks.set(i, null); r.run(); }
+        }
+    }
+
+    @Test public void aTranslationThatNeverAnswersTimesOutAndTheNextOneRuns() {
+        FakeDelay delay = new FakeDelay();
+        TranslationScheduler t = new TranslationScheduler(fake, Runnable::run, delay, new TranslationScheduler.Listener() {
+            public void translated(String cueId) { events.add("ok:" + cueId); }
+            public void failed(String cueId, String code) { events.add("fail:" + cueId + ":" + code); }
+        });
+        t.reset("en", "vi");
+        t.want("stuck", "Stuck line", 0, true);
+        t.want("next", "Next line", 1000, false);
+        assertEquals(1, fake.requests.size());
+        delay.advance(TranslationScheduler.TIMEOUT_MS - 1);
+        assertNull(t.error("stuck"));
+        delay.advance(1);
+        assertEquals(TranslationScheduler.E_FAILED, t.error("stuck"));
+        assertNull("a timeout is not fatal for the pair", t.fatalError());
+        assertEquals("the next cue is sent at once", 2, fake.requests.size());
+        fake.answer(); // the stuck answer arrives late: ignored
+        assertNull(t.result("stuck"));
+        assertEquals(TranslationScheduler.E_FAILED, t.error("stuck"));
+        fake.answer(); // "next"
+        assertEquals("VI(Next line)", t.result("next"));
+        delay.advance(TranslationScheduler.TIMEOUT_MS); // its timer was cancelled on success
+        assertEquals("VI(Next line)", t.result("next"));
+        assertEquals(0, t.running());
+    }
 }

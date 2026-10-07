@@ -100,7 +100,12 @@ Owner 07-10-2026: AI Thuyết minh always reads a **softsub** (text subtitle). A
 the voice language first, else English, then Japanese, then others; AniSub translates it on the TV
 (Google ML Kit Translate) into the **voice language** (`vi` default, or `en`) and speaks it. Pairs
 that matter: en->vi, ja->vi, vi->en, ja->en (others are best-effort). Everything is additive: a
-minor-1 client (no `voiceLang`, `language:"vi"`) gets exactly the 1.1 behaviour.
+minor-1 client (no `voiceLang`, `language:"vi"`) keeps the 1.1 behaviour with these documented
+differences: CAPABILITIES reports `minor:2` and extra objects (legacy fields keep their meaning;
+`translation`/`multiSpeaker` stay false); an AI OPEN with `language` other than vi now gets
+`TRANSLATE_*`/is translated instead of `UNSUPPORTED`; a cue starting more than 5 s ahead goes to the
+timeline instead of `OUTSIDE_HORIZON` (it is spoken when due); AI-mode cue text is cleaned of
+ASS/HTML markup before speaking; a cue id already queued or held by the timeline is not spoken twice.
 
 **CAPABILITIES additions** (fixture: `tests/fixtures/android-v1/capabilities-minor2.json`, schema:
 `protocol/schema/android-v1.schema.json`):

@@ -107,6 +107,7 @@ public final class DebugHarnessActivity extends Activity {
                 case "speak": speak(arg(intent, "lang", "vi"), intent.getStringExtra("text")); break;
                 case "session": timelineFlag = intent.getBooleanExtra("timeline", true); session(arg(intent, "from", "en"), arg(intent, "to", "vi"), intent.getIntExtra("cues", 20)); break;
                 case "cleanup": cleanup(); break;
+                case "dm-probe": dmProbe(arg(intent, "lang", "vi")); break;
                 default: log("unknown cmd");
             }
         } catch (Exception e) { log("FAILED " + e); }
@@ -146,7 +147,7 @@ public final class DebugHarnessActivity extends Activity {
 
     private void mlkitDownload(String lang) {
         final long t0 = SystemClock.elapsedRealtime();
-        boolean started = host.translation().download(lang, true, ok -> log("mlkit-download " + lang + " ok=" + ok + " in "
+        boolean started = host.translation().download(lang, ok -> log("mlkit-download " + lang + " ok=" + ok + " in "
                 + (SystemClock.elapsedRealtime() - t0) + " ms; error=" + host.translation().lastDownloadError() + " models=" + host.translation().models()));
         log("mlkit-download " + lang + " started=" + started + " available=" + host.translation().available() + " reason=" + host.translation().unavailableReason());
     }
@@ -293,6 +294,38 @@ public final class DebugHarnessActivity extends Activity {
         Bundle b = new Bundle(); b.putString("payload", payload.toString()); m.setData(b);
         m.replyTo = replies;
         service.send(m);
+    }
+
+    /**
+     * Downloads every file of a catalog pack through the system DownloadManager (the release transport;
+     * AniSub has no INTERNET permission) into the cache, checks size + SHA-256, then deletes the copies.
+     * The installed pack is not touched.
+     */
+    private void dmProbe(final String lang) {
+        final com.anisub.runtime.voice.VoiceCatalog.Pack pack = host.catalog().forLanguage(lang);
+        final File dir = new File(getCacheDir(), "dm-probe");
+        new Thread(() -> {
+            com.anisub.runtime.voice.SystemDownloadFetcher f = new com.anisub.runtime.voice.SystemDownloadFetcher(this, "AniSub-harness");
+            long t0 = SystemClock.elapsedRealtime(), total = 0; int ok = 0;
+            dir.mkdirs();
+            for (com.anisub.runtime.voice.VoiceCatalog.PackFile pf : pack.files) {
+                File target = new File(dir, pf.path.replace('/', '.'));
+                long t1 = SystemClock.elapsedRealtime();
+                String err = f.fetch(pf.urls.get(0), target, pf.bytes, b -> { }, () -> false);
+                String sha;
+                try { sha = com.anisub.runtime.voice.VoicePackManagerAccess.sha256(target); } catch (IOException e) { sha = "io"; }
+                boolean good = err == null && target.length() == pf.bytes && pf.sha256.equals(sha);
+                if (good) { ok++; total += pf.bytes; }
+                final String line = "dm-probe " + pf.path + " err=" + err + " bytes=" + target.length() + "/" + pf.bytes + " sha=" + (pf.sha256.equals(sha) ? "match" : "MISMATCH") + " " + (SystemClock.elapsedRealtime() - t1) + " ms";
+                main.post(() -> log(line));
+                //noinspection ResultOfMethodCallIgnored
+                target.delete();
+            }
+            final String sum = "dm-probe " + lang + " summary: " + ok + "/" + pack.files.size() + " verified, " + total + " bytes in " + (SystemClock.elapsedRealtime() - t0) + " ms";
+            main.post(() -> log(sum));
+            //noinspection ResultOfMethodCallIgnored
+            dir.delete();
+        }, "dm-probe").start();
     }
 
     /** Removes what the harness installed: the English pack, ML Kit models, side-loaded files. */

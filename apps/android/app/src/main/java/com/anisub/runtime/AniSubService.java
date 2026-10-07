@@ -30,13 +30,14 @@ public final class AniSubService extends Service {
     private static final long SYSTEM_WATCHDOG_MS = 30000, AI_WATCHDOG_CAP_MS = 120000;
     /** Cues starting further ahead than this are kept in the timeline, not the speech queue. */
     static final long HORIZON_MS = 5000;
-    static final long TICK_MS = 500, DETECT_WAIT_MS = 1500;
+    static final long TICK_MS = 500, DETECT_WAIT_MS = 1500, DETECT_TIMEOUT_MS = 10_000;
     static final int DETECT_UNITS = 300, DETECT_CUES = 6, LOOKAHEAD_BATCH = 64;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final SessionGate gate = new SessionGate();
     private final ArrayDeque<Job> queue = new ArrayDeque<>();
     private final RecentCueIds seen = new RecentCueIds();
     private final CueTimeline timeline = new CueTimeline();
+    private final CueIntake intake = new CueIntake(seen, timeline);
     private TranslationScheduler scheduler;
     private SpeechEngine engine;
     private RuntimeHost host;
@@ -83,7 +84,10 @@ public final class AniSubService extends Service {
         host = RuntimeHost.get(this);
         host.addListener(hostChanged);
         host.addEngineListener(aiListener);
-        scheduler = new TranslationScheduler(host.translation(), handler::post, new TranslationScheduler.Listener() {
+        scheduler = new TranslationScheduler(host.translation(), handler::post, (task, ms) -> {
+            handler.postDelayed(task, ms);
+            return () -> handler.removeCallbacks(task);
+        }, new TranslationScheduler.Listener() {
             public void translated(String cueId) { drain(); }
             public void failed(String cueId, String code) { drain(); }
         });
@@ -173,8 +177,8 @@ public final class AniSubService extends Service {
             if ("CUES".equals(type) && Objects.equals(session, id) && !OpenRules.MODE_AI.equals(mode) && !"vi".equals(language)) throw new JSONException("cue language");
             boolean newSession = "OPEN".equals(type) || !Objects.equals(session, id);
             if (newSession || rev != revision) {
-                cancel(); seen.clear();
-                if (newSession) { openTranslate = false; resetContent(); } else timeline.restart(pos);
+                cancel(); intake.restart(pos);
+                if (newSession) { openTranslate = false; resetContent(); }
             }
             session = id; revision = rev; position = pos; speed = rate; anchor = SystemClock.elapsedRealtime();
             if ("CUES".equals(type)) {
@@ -182,12 +186,13 @@ public final class AniSubService extends Service {
                 if (incoming.isEmpty() && !timelineBatch) removeSnapshotJobs();
                 for (Job job : incoming) {
                     if (job == null) continue;
-                    if (timelineBatch || job.start > mediaNow() + HORIZON_MS) { addToTimeline(job); continue; }
-                    if (seen.contains(job.id)) continue;
+                    CueIntake.Route route = intake.route(job.id, job.start, mediaNow(), timelineBatch);
+                    if (route == CueIntake.Route.TIMELINE) { addToTimeline(job); continue; }
+                    if (route == CueIntake.Route.DUPLICATE) continue; // queued/spoken already, or the timeline owns it
                     if (queue.size() >= QUEUE) { event("ERROR", job, "BACKPRESSURE"); continue; }
                     if (job.end >= 0 && job.end <= mediaNow()) { event("ERROR", job, "EXPIRED"); continue; }
                     if (aiMode() && !TextSplitter.speakable(job.clean)) continue;
-                    seen.add(job.id);
+                    intake.queued(job.id);
                     job.utterance = "speech-" + (++counter);
                     queue.add(job);
                     noteForDetection(job.clean);
@@ -201,6 +206,8 @@ public final class AniSubService extends Service {
                 if (ai) {
                     openTranslate = decision.translate; openSource = decision.source;
                     resetContent();
+                    // A session without translation frees any translator/identifier a previous one left.
+                    if (!openTranslate && host.translation() != null) host.translation().releaseClients();
                     host.engine().setLanguage(voiceLang);
                     host.engine().setVoice(decision.voiceId != null ? decision.voiceId : host.defaultVoice());
                     host.engine().load();
@@ -208,7 +215,7 @@ public final class AniSubService extends Service {
                 else if (host.engine() != null) host.engine().scheduleIdleUnload(); // free native memory after an AI session
             }
             else {
-                cancel(); seen.clear(); timeline.restart(pos);
+                cancel(); intake.restart(pos);
                 if ("PAUSE".equals(type) || "STOP".equals(type) || "CLOSE".equals(type)
                         || "EPISODE_CHANGE".equals(type) || "SOURCE_CHANGE".equals(type)) playing = false;
                 if ("EPISODE_CHANGE".equals(type) || "SOURCE_CHANGE".equals(type)) resetContent();
@@ -296,7 +303,7 @@ public final class AniSubService extends Service {
     private void promote() {
         if (!playing || timeline.isEmpty()) return;
         List<CueTimeline.Entry> due = new ArrayList<>(), expired = new ArrayList<>();
-        timeline.collect(mediaNow(), HORIZON_MS, Math.max(0, QUEUE - queue.size()), due, expired);
+        intake.promote(mediaNow(), Math.max(0, QUEUE - queue.size()), due, expired);
         for (CueTimeline.Entry e : expired) event("ERROR", fromTimeline(e), "EXPIRED");
         for (CueTimeline.Entry e : due) {
             Job job = fromTimeline(e);
@@ -327,13 +334,14 @@ public final class AniSubService extends Service {
         final long generation = detectGeneration;
         final String sample = detectText.toString();
         detectText.setLength(0);
-        host.translation().identify(sample, (lang, assumed) -> {
+        host.translation().identify(sample, DETECT_TIMEOUT_MS, (lang, assumed) -> {
             if (generation != detectGeneration || !detecting) return;
             detected(lang, assumed);
         });
     }
     private void detected(String lang, boolean assumed) {
         detecting = false;
+        host.translation().closeIdentifier(); // one detection per content: free the language-id model
         JSONObject result = new JSONObject();
         try {
             result.put("type", "LANGUAGE_DETECTED").put("major", 1).put("session", session).put("revision", revision)

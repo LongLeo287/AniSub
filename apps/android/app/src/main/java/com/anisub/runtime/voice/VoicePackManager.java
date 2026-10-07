@@ -38,6 +38,19 @@ public final class VoicePackManager {
     static final long PROGRESS_STEP = 512 << 10;
 
     public interface Listener { void changed(Status status); }
+    public interface Progress { void progress(long bytesOfThisFile); }
+    public interface Cancelled { boolean cancelled(); }
+    /**
+     * Transport for one pinned file: complete {@code url} into {@code target} (a resumable transport
+     * may continue an existing partial target). Returns null when the transfer ended, else an error
+     * code (E_NETWORK, E_CANCELLED, E_STORAGE, E_NO_SPACE, E_CORRUPT = wrong length). Size and SHA-256
+     * are always verified by the manager afterwards. Blocking; worker thread.
+     */
+    public interface FileFetcher {
+        String fetch(String url, File target, long expectedBytes, Progress progress, Cancelled cancelled);
+        /** Aborts an in-flight transfer promptly (any thread). */
+        void abort();
+    }
     /** Optional post-install engine smoke test; returns null on success or an error code. */
     public interface SmokeTest { String run(File packDirectory, VoiceCatalog.Pack pack); }
 
@@ -55,7 +68,7 @@ public final class VoicePackManager {
     private final ModelStore store;
     private final VoiceCatalog catalog;
     private final String packId;
-    private final HttpSource http;
+    private final FileFetcher fetcher;
     private final SmokeTest smoke;
     private final Listener listener;
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> { Thread t = new Thread(r, "anisub-voice-download"); t.setDaemon(true); return t; });
@@ -65,7 +78,6 @@ public final class VoicePackManager {
     private long done, total, lastPublished;
     private String error;
     private volatile boolean cancelRequested, keepPreviousUntilRestart;
-    private volatile HttpSource.Response current;
     private boolean busy;
 
     /** Manager of the catalog's default (Vietnamese, minor 1) pack. */
@@ -73,10 +85,15 @@ public final class VoicePackManager {
         this(store, catalog, catalog == null || catalog.defaultPack() == null ? null : catalog.defaultPack().id, http, smoke, listener);
     }
 
-    /** Manager of one catalog pack ({@code packId}); several managers may share one store. */
+    /** Pack manager over a direct HTTP source (JVM tests; resumable). */
     public VoicePackManager(ModelStore store, VoiceCatalog catalog, String packId, HttpSource http, SmokeTest smoke, Listener listener) {
-        if (store == null || catalog == null || http == null || listener == null) throw new IllegalArgumentException("ports");
-        this.store = store; this.catalog = catalog; this.http = http; this.smoke = smoke; this.listener = listener;
+        this(store, catalog, packId, http == null ? null : new HttpFetcher(http), smoke, listener);
+    }
+
+    /** Manager of one catalog pack ({@code packId}); several managers may share one store. */
+    public VoicePackManager(ModelStore store, VoiceCatalog catalog, String packId, FileFetcher fetcher, SmokeTest smoke, Listener listener) {
+        if (store == null || catalog == null || fetcher == null || listener == null) throw new IllegalArgumentException("ports");
+        this.store = store; this.catalog = catalog; this.fetcher = fetcher; this.smoke = smoke; this.listener = listener;
         this.packId = packId;
         refresh();
         cleanupSuperseded();
@@ -161,8 +178,7 @@ public final class VoicePackManager {
     /** Cancels promptly: also closes the in-flight response so a stalled read cannot delay it. */
     public void cancel() {
         cancelRequested = true;
-        HttpSource.Response r = current;
-        if (r != null) r.close();
+        fetcher.abort();
     }
 
     /** Removes the installed (or corrupt) pack unless a speech session holds its lease. Not on the main thread. */
@@ -244,7 +260,6 @@ public final class VoicePackManager {
             failure = E_STORAGE;
         } finally {
             if (stage != null) try { store.discardStage(stage); } catch (IOException ignored) { }
-            current = null;
             refresh();
             synchronized (lock) {
                 busy = false;
@@ -270,7 +285,9 @@ public final class VoicePackManager {
                 long have = part.isFile() ? part.length() : 0;
                 if (have > f.bytes) { delete(part); have = 0; }
                 if (have < f.bytes) {
-                    String result = transfer(url, part, have, f.bytes, baseDone);
+                    final long base = baseDone;
+                    String result = fetcher.fetch(url, part, f.bytes, bytes -> progress(base + bytes), () -> cancelRequested);
+                    if (cancelRequested) return E_CANCELLED;
                     if (result != null) {
                         if (E_CANCELLED.equals(result) || E_STORAGE.equals(result)) return result;
                         last = result;
@@ -291,39 +308,6 @@ public final class VoicePackManager {
         }
         delete(part);
         return last;
-    }
-
-    /** One HTTP attempt. Returns null when the response body was fully read. */
-    private String transfer(String url, File part, long have, long expected, long baseDone) {
-        HttpSource.Response r;
-        try { r = http.open(url, have); } catch (IOException e) { return E_NETWORK; }
-        current = r;
-        try {
-            if (cancelRequested) return E_CANCELLED;
-            if (have > 0 && !r.resumed) { delete(part); have = 0; }
-            if (r.length >= 0 && have + r.length != expected) { delete(part); return E_CORRUPT; }
-            OutputStream out;
-            try { out = new FileOutputStream(part, have > 0); } catch (IOException e) { return E_STORAGE; }
-            try {
-                byte[] buf = new byte[64 * 1024]; long got = have;
-                while (true) {
-                    int n;
-                    try { n = r.body.read(buf); } catch (IOException e) { return cancelRequested ? E_CANCELLED : E_NETWORK; }
-                    if (n == -1) break;
-                    if (cancelRequested) return E_CANCELLED;
-                    if (got + n > expected) return E_CORRUPT;
-                    try { out.write(buf, 0, n); } catch (IOException e) { return E_STORAGE; } // disk full is not a network error
-                    got += n;
-                    progress(baseDone + got);
-                }
-                return null;
-            } finally {
-                try { out.close(); } catch (IOException ignored) { }
-            }
-        } finally {
-            current = null;
-            r.close();
-        }
     }
 
     private void progress(long bytes) {

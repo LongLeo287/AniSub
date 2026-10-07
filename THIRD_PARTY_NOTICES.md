@@ -1,7 +1,14 @@
 # Third-party notices
 
-AniSub is licensed under GPL-3.0-or-later (see `LICENSE`). It includes or downloads the following
-third-party components. No third-party model data is stored in this repository.
+AniSub's own code is licensed under GPL-3.0-or-later (see `LICENSE`). The Android APK combines it
+with the open-source components below, among them GPL-3.0-or-later ones (espeak-ng). Since AniSub
+0.3.0 the APK also contains **closed-source** Google ML Kit components (owner's choice, 07-10-2026);
+they are not licensed under the GPL, so the APK is not GPL-only: AniSub's code and the open-source
+components are under their licences, the ML Kit components under Google's terms. Whether a
+closed-source library may ship in one program with GPL-3.0 components is a noted GPL compatibility
+concern, the same one AniBox records for its ML Kit OCR (AniBox NOTICE section 1c, LOGO-001/LOGO-004).
+Each component keeps its own licence and notices. No third-party model data is stored in this
+repository.
 
 ## Bundled in the Android APK
 
@@ -34,9 +41,10 @@ source for the binaries is the sherpa-onnx v1.13.8 tag and the dependency versio
 | espeak-ng-data subset | GPL-3.0-or-later |
 | ML Kit translation models (Google, downloaded by ML Kit from dl.google.com) | ML Kit Terms of Service |
 
-The ML Kit components are not GPL-compatible free software. They are a separate, optional feature
-the owner chose (as AniBox did for OCR); AniSub removes their telemetry backend
-(`TransportBackendDiscovery`) and start-up providers, and downloads models only after consent.
+The ML Kit components are proprietary (no corresponding source). AniSub removes their telemetry
+backend (`TransportBackendDiscovery`) and start-up providers, and has **no INTERNET permission**:
+ML Kit's in-process Firebase Installations / Remote Config clients cannot connect; translation models
+and voice packs are downloaded by Android's system DownloadManager.
 Details and caveats: [docs/voices.md](docs/voices.md).
 
 ## Windows prototype

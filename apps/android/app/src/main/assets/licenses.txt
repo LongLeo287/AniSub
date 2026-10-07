@@ -1,8 +1,17 @@
 AniSub — phần bổ trợ thuyết minh AI cho AniBox
-Giấy phép: GPL-3.0-or-later. Mã nguồn: https://github.com/LongLeo287/AniSub
+Mã nguồn AniSub: GPL-3.0-or-later — https://github.com/LongLeo287/AniSub
 
-AniSub không thu âm, không chụp màn hình và không gửi phụ đề ra ngoài. Mạng chỉ được dùng khi
-bạn đồng ý tải gói giọng hoặc mô hình dịch. Sau khi tải, giọng AI và bản dịch chạy hoàn toàn trên TV.
+GIẤY PHÉP CỦA APK: mã của AniSub và các thành phần mã nguồn mở dưới đây theo giấy phép riêng của
+chúng (trong đó có thành phần GPL-3.0-or-later). APK còn chứa thành phần MÃ NGUỒN ĐÓNG của Google
+(ML Kit, mục bên dưới) mà chủ dự án chọn đưa vào ngày 07-10-2026; chúng không theo GPL, nên APK
+không còn là "chỉ GPL". Việc một thư viện đóng nằm chung chương trình với thành phần GPL-3.0 là một
+lo ngại tương thích GPL đã được ghi nhận (như AniBox, LOGO-001/LOGO-004).
+
+QUYỀN RIÊNG TƯ: AniSub không thu âm, không chụp màn hình và không gửi phụ đề ra ngoài. AniSub KHÔNG
+có quyền Internet: mọi tệp được tải bằng trình tải xuống của hệ thống Android (Download Manager) —
+gói giọng từ bản phát hành AniSub trên GitHub, mô hình dịch từ máy chủ Google (dl.google.com) — rồi
+được kiểm tra trong AniSub. Vì không có quyền Internet, các lệnh gọi mạng riêng của ML Kit (Firebase
+Installations / Remote Config của Google) không kết nối được. Giọng AI và bản dịch chạy hoàn toàn trên TV.
 
 THÀNH PHẦN BÊN THỨ BA TRONG APK
 
@@ -16,11 +25,19 @@ THÀNH PHẦN BÊN THỨ BA TRONG APK
   - nlohmann/json — MIT; Eigen — MPL-2.0
   Danh sách và phiên bản chính xác của các thư viện con nằm trong thư mục cmake/ của sherpa-onnx
   tại tag v1.13.8; đó cũng là mã nguồn tương ứng của thư viện nhị phân.
-• Google ML Kit Translate 17.0.3 và ML Kit Language Identification 17.0.6 (kèm Google Play services
-  tasks/basement, Firebase components, AndroidX) — phần mềm đóng của Google, theo Điều khoản dịch vụ
-  ML Kit: https://developers.google.com/ml-kit/terms . AniSub tắt phần gửi nhật ký sử dụng của ML Kit
-  (không có backend Firebase datatransport). Mô hình dịch (~30 MB mỗi ngôn ngữ) chỉ được tải từ máy
-  chủ Google khi bạn đồng ý trong mục Dịch phụ đề; dịch chạy trên TV, phụ đề không gửi đi đâu.
+THÀNH PHẦN MÃ NGUỒN ĐÓNG TRONG APK (không theo GPL)
+
+• Google ML Kit Translate 17.0.3 (libtranslate_jni.so) và ML Kit Language Identification 17.0.6 với
+  mô hình kèm sẵn (liblanguage_id_l2c_jni.so), cùng các thư viện Google Play services tasks/basement/base
+  và Firebase components / datatransport đi kèm — phần mềm độc quyền của Google: không có mã nguồn
+  tương ứng, theo Điều khoản dịch vụ ML Kit https://developers.google.com/ml-kit/terms và Giấy phép
+  Android SDK. Chỉ dùng để dịch phụ đề và nhận diện ngôn ngữ ngay trên TV. Phần gửi nhật ký sử dụng của
+  ML Kit bị tắt (không có backend datatransport). Mô hình dịch (tải ~30 MB, chiếm 45–65 MB mỗi ngôn ngữ)
+  chỉ được tải khi bạn đồng ý trong mục Dịch phụ đề.
+
+THÀNH PHẦN MÃ NGUỒN MỞ KHÁC TRONG APK
+
+• AndroidX, Kotlin standard library, kotlinx-coroutines (đi kèm ML Kit) — Apache-2.0.
 • Các lớp Java com.k2fsa.sherpa.onnx.* được rút gọn từ sherpa-onnx java-api — Apache-2.0
   (Copyright 2024 Xiaomi Corporation).
 
