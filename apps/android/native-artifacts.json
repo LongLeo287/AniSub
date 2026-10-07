@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "engine": "sherpa-onnx",
+  "version": "1.13.8",
+  "license": "Apache-2.0 (sherpa-onnx); statically links onnxruntime (MIT), espeak-ng (GPL-3.0-or-later), piper-phonemize (MIT) and other upstream components; see THIRD_PARTY_NOTICES.md",
+  "source": "https://github.com/k2-fsa/sherpa-onnx/tree/v1.13.8",
+  "archive": {
+    "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-v1.13.8-android-static-link-onnxruntime.tar.bz2",
+    "bytes": 35101751,
+    "sha256": "7583ca385ae7d981e65468455c2ea2c9f2da383921dccfc5658d0dc19d309e6f"
+  },
+  "libraries": [
+    { "abi": "armeabi-v7a", "file": "libsherpa-onnx-jni.so", "bytes": 16437284, "sha256": "2c0350f9c23dda60318c0d195fcc02d505f05cdbfba89492a4468d2c4276be28" },
+    { "abi": "arm64-v8a", "file": "libsherpa-onnx-jni.so", "bytes": 24169352, "sha256": "b4a53d915c19cb6d09b1cdc9a8084be54419b647aab9097ffdfb46f30c3c4dd8" },
+    { "abi": "x86", "file": "libsherpa-onnx-jni.so", "bytes": 5540732, "sha256": "914ce3d8e77c4ec13b178a8657b2bb9d6187ea6deddbdd519be0373c71eb681d", "emulatorOnly": true },
+    { "abi": "x86", "file": "libonnxruntime.so", "bytes": 26491148, "sha256": "fcb6cd80415f7951e58fdd8158a238946dce3710d5fee492b67174d5131f9eee", "emulatorOnly": true }
+  ]
+}

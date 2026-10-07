@@ -1,0 +1,75 @@
+# Model weights, voice packs and local runtime data (downloaded/verified separately, never committed)
+models/
+work/
+dist/
+*.onnx
+*.onnx.data
+*.bin
+*.pt
+*.pth
+*.safetensors
+*.npz
+*.gguf
+*.tar.bz2
+*.tar.gz
+*.zip
+
+# Python / Node environments and caches
+.venv/
+venv/
+__pycache__/
+*.pyc
+node_modules/
+
+# Android / Gradle build outputs and native payload (fetched by apps/android/tools/fetch-native.ps1)
+**/build/
+.gradle/
+**/.gradle/
+local.properties
+apps/android/native/
+*.apk
+*.aab
+*.so
+*.dll
+*.exe
+*.idsig
+
+# Signing material, secrets and tokens: never commit
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+keystore.properties
+signing.properties
+.env
+.env.*
+*.token
+secrets.*
+
+# Large media and test videos
+*.mp4
+*.mkv
+*.webm
+*.avi
+*.mov
+*.wav
+*.mp3
+*.flac
+*.m4a
+tests/fixtures/*.mp4
+
+# Local registration / IDE / OS files
+apps/desktop/native-messaging/registration/
+.idea/
+.vs/
+.vscode/
+*.iml
+*.log
+Thumbs.db
+.DS_Store
+
+# Owner-private research inventory (names private repos) - kept locally, never published
+docs/research/sheet-repo-snapshot.csv
+docs/research/sheet-candidate-inventory.csv

@@ -1,0 +1,636 @@
+[
+  {
+    "name": "hello-ignore-inert-options",
+    "message": {
+      "major": 2,
+      "type": "HELLO",
+      "requestId": "r",
+      "minor": 0,
+      "futureOption": {
+        "execute": "never"
+      }
+    }
+  },
+  {
+    "name": "capabilities",
+    "message": {
+      "major": 2,
+      "type": "GET_CAPABILITIES",
+      "requestId": "r"
+    }
+  },
+  {
+    "name": "settings",
+    "message": {
+      "major": 2,
+      "type": "GET_SETTINGS",
+      "requestId": "r"
+    }
+  },
+  {
+    "name": "auto-null-selection",
+    "message": {
+      "major": 2,
+      "type": "SET_SETTINGS",
+      "requestId": "r",
+      "expectedSettingsRevision": 0,
+      "settings": {
+        "voiceMode": "AUTO",
+        "modelId": null,
+        "modelVersion": null,
+        "voiceId": null,
+        "targetLanguage": "vi",
+        "rateMode": "AUTO",
+        "deliveryMode": "LIVE_BOUNDED",
+        "downloadQuotaBytes": 4294967296
+      }
+    }
+  },
+  {
+    "name": "explicit-selection",
+    "message": {
+      "major": 2,
+      "type": "SET_SETTINGS",
+      "requestId": "r",
+      "expectedSettingsRevision": 1,
+      "settings": {
+        "voiceMode": "EXPLICIT",
+        "modelId": "m",
+        "modelVersion": "1",
+        "voiceId": "v",
+        "targetLanguage": "vi",
+        "rateMode": "NATURAL",
+        "deliveryMode": "LIVE_BOUNDED"
+      }
+    }
+  },
+  {
+    "name": "default-page",
+    "message": {
+      "major": 2,
+      "type": "LIST_MODELS",
+      "requestId": "r"
+    }
+  },
+  {
+    "name": "voice-page",
+    "message": {
+      "major": 2,
+      "type": "LIST_VOICES",
+      "requestId": "r",
+      "modelId": "m",
+      "version": "1",
+      "pageToken": null,
+      "pageSize": 16
+    }
+  },
+  {
+    "name": "download-consented",
+    "message": {
+      "major": 2,
+      "type": "DOWNLOAD_MODEL",
+      "requestId": "r",
+      "modelId": "m",
+      "version": "1",
+      "consent": true
+    }
+  },
+  {
+    "name": "cancel-download",
+    "message": {
+      "major": 2,
+      "type": "CANCEL_DOWNLOAD",
+      "requestId": "r",
+      "operationId": "op"
+    }
+  },
+  {
+    "name": "remove",
+    "message": {
+      "major": 2,
+      "type": "REMOVE_MODEL",
+      "requestId": "r",
+      "modelId": "m",
+      "version": "1"
+    }
+  },
+  {
+    "name": "prepare",
+    "message": {
+      "major": 2,
+      "type": "PREPARE_MODEL",
+      "requestId": "r",
+      "modelId": "m",
+      "version": "1"
+    }
+  },
+  {
+    "name": "open-flat-fields",
+    "message": {
+      "major": 2,
+      "type": "OPEN",
+      "requestId": "r",
+      "sessionId": "s",
+      "revision": 0,
+      "seq": 1,
+      "episodeRef": "e",
+      "sourceRef": "src",
+      "trackRef": "t",
+      "inputMode": "DIRECT_TEXT",
+      "trackAvailability": "TEXT_TRACK",
+      "originalLanguage": "vi",
+      "targetLanguage": "vi",
+      "settingsRevision": 0,
+      "modelId": "m",
+      "version": "1",
+      "voiceId": "v",
+      "speechEnabled": true,
+      "clock": {
+        "positionMs": 0,
+        "sampledAtElapsedMs": 10,
+        "playing": true,
+        "speed": 1
+      }
+    }
+  },
+  {
+    "name": "unknown-timing-preserved",
+    "message": {
+      "major": 2,
+      "type": "CUE_SNAPSHOT",
+      "requestId": "r",
+      "sessionId": "s",
+      "revision": 0,
+      "seq": 2,
+      "cues": [
+        {
+          "cueId": "c",
+          "originalText": "Xin chào",
+          "language": "vi",
+          "observedAtMediaMs": 10,
+          "startMs": null,
+          "endMs": null,
+          "origin": "DIRECT",
+          "role": "UNKNOWN",
+          "trackRef": "t",
+          "futurePosition": "upper"
+        }
+      ]
+    }
+  },
+  {
+    "name": "empty-snapshot",
+    "message": {
+      "major": 2,
+      "type": "CUE_SNAPSHOT",
+      "requestId": "r",
+      "sessionId": "s",
+      "revision": 0,
+      "seq": 3,
+      "cues": []
+    }
+  },
+  {
+    "name": "known-timeline",
+    "message": {
+      "major": 2,
+      "type": "TIMELINE_BATCH",
+      "requestId": "r",
+      "sessionId": "s",
+      "revision": 0,
+      "seq": 4,
+      "cues": [
+        {
+          "cueId": "c2",
+          "originalText": "Không",
+          "language": "vi",
+          "observedAtMediaMs": 10,
+          "startMs": 100,
+          "endMs": 200,
+          "origin": "DIRECT",
+          "role": "DIALOGUE",
+          "trackRef": "t"
+        }
+      ]
+    }
+  },
+  {
+    "name": "clock",
+    "message": {
+      "major": 2,
+      "type": "CLOCK_ANCHOR",
+      "requestId": "r",
+      "sessionId": "s",
+      "revision": 0,
+      "seq": 5,
+      "clock": {
+        "positionMs": 10,
+        "sampledAtElapsedMs": 100,
+        "playing": true,
+        "speed": 1
+      }
+    }
+  },
+  {
+    "name": "play",
+    "message": {
+      "major": 2,
+      "type": "PLAY",
+      "requestId": "r",
+      "sessionId": "s",
+      "revision": 0,
+      "seq": 6,
+      "clock": {
+        "positionMs": 10,
+        "sampledAtElapsedMs": 100,
+        "playing": true,
+        "speed": 0.5
+      }
+    }
+  },
+  {
+    "name": "pause",
+    "message": {
+      "major": 2,
+      "type": "PAUSE",
+      "requestId": "r",
+      "sessionId": "s",
+      "revision": 1,
+      "seq": 7,
+      "clock": {
+        "positionMs": 10,
+        "sampledAtElapsedMs": 100,
+        "playing": false,
+        "speed": 1
+      }
+    }
+  },
+  {
+    "name": "seek",
+    "message": {
+      "major": 2,
+      "type": "SEEK",
+      "requestId": "r",
+      "sessionId": "s",
+      "revision": 2,
+      "seq": 8,
+      "clock": {
+        "positionMs": 0,
+        "sampledAtElapsedMs": 100,
+        "playing": false,
+        "speed": 1
+      }
+    }
+  },
+  {
+    "name": "stop",
+    "message": {
+      "major": 2,
+      "type": "STOP",
+      "requestId": "r",
+      "sessionId": "s",
+      "revision": 3,
+      "seq": 9,
+      "clock": {
+        "positionMs": 0,
+        "sampledAtElapsedMs": 100,
+        "playing": false,
+        "speed": 1
+      }
+    }
+  },
+  {
+    "name": "speed-max",
+    "message": {
+      "major": 2,
+      "type": "PLAYBACK_SPEED",
+      "requestId": "r",
+      "sessionId": "s",
+      "revision": 4,
+      "seq": 10,
+      "clock": {
+        "positionMs": 0,
+        "sampledAtElapsedMs": 100,
+        "playing": true,
+        "speed": 2
+      }
+    }
+  },
+  {
+    "name": "episode-close",
+    "message": {
+      "major": 2,
+      "type": "EPISODE_CHANGE",
+      "requestId": "r",
+      "sessionId": "s",
+      "revision": 5,
+      "seq": 11
+    }
+  },
+  {
+    "name": "source-close",
+    "message": {
+      "major": 2,
+      "type": "SOURCE_CHANGE",
+      "requestId": "r",
+      "sessionId": "s",
+      "revision": 6,
+      "seq": 12
+    }
+  },
+  {
+    "name": "safe-max",
+    "message": {
+      "major": 2,
+      "type": "CLOSE",
+      "requestId": "r",
+      "sessionId": "s",
+      "revision": 9007199254740991,
+      "seq": 9007199254740991
+    }
+  },
+  {
+    "name": "ack-operation",
+    "message": {
+      "major": 2,
+      "type": "ACK",
+      "requestId": "r",
+      "operationId": "op"
+    }
+  },
+  {
+    "name": "hello-ack-bounds",
+    "message": {
+      "major": 2,
+      "type": "HELLO_ACK",
+      "requestId": "r",
+      "minor": 0,
+      "limits": {
+        "maxPayloadUtf16Units": 16384,
+        "maxBundleBytes": 65536,
+        "maxCues": 16,
+        "maxTextUtf16Units": 512,
+        "maxIdUtf16Units": 80,
+        "maxPageSize": 16,
+        "maxInstalledVersions": 64,
+        "maxReadyModels": 1
+      }
+    }
+  },
+  {
+    "name": "settings-result",
+    "message": {
+      "major": 2,
+      "type": "SETTINGS",
+      "requestId": "r",
+      "settingsRevision": 3,
+      "settings": {
+        "voiceMode": "AUTO",
+        "modelId": null,
+        "modelVersion": null,
+        "voiceId": null,
+        "targetLanguage": "vi",
+        "rateMode": "AUTO",
+        "deliveryMode": "LIVE_BOUNDED"
+      }
+    }
+  },
+  {
+    "name": "settings-conflict-current",
+    "message": {
+      "major": 2,
+      "type": "ERROR",
+      "requestId": "r",
+      "code": "SETTINGS_CONFLICT",
+      "recoverable": true,
+      "settingsRevision": 4,
+      "settings": {
+        "voiceMode": "AUTO",
+        "modelId": null,
+        "modelVersion": null,
+        "voiceId": null,
+        "targetLanguage": "vi",
+        "rateMode": "AUTO",
+        "deliveryMode": "LIVE_BOUNDED"
+      }
+    }
+  },
+  {
+    "name": "error-identifiers-available",
+    "message": {
+      "major": 2,
+      "type": "ERROR",
+      "sessionId": "s",
+      "revision": 0,
+      "code": "STALE",
+      "recoverable": false
+    }
+  },
+  {
+    "name": "model-progress",
+    "message": {
+      "major": 2,
+      "type": "MODEL_PROGRESS",
+      "operationId": "op",
+      "bytesTransferred": 0,
+      "expectedBytes": 9007199254740991
+    }
+  },
+  {
+    "name": "model-error",
+    "message": {
+      "major": 2,
+      "type": "MODEL_STATE",
+      "modelId": "m",
+      "version": "1",
+      "state": "ERROR",
+      "reason": "MODEL_CORRUPT"
+    }
+  },
+  {
+    "name": "model-cancel-reason",
+    "message": {
+      "major": 2,
+      "type": "MODEL_STATE",
+      "operationId": "op",
+      "modelId": "m",
+      "version": "1",
+      "state": "NOT_INSTALLED",
+      "reason": "CANCELLED"
+    }
+  },
+  {
+    "name": "model-idle-unload",
+    "message": {
+      "major": 2,
+      "type": "MODEL_STATE",
+      "modelId": "m",
+      "version": "1",
+      "state": "INSTALLED"
+    }
+  },
+  {
+    "name": "models-page",
+    "message": {
+      "major": 2,
+      "type": "MODELS",
+      "requestId": "r",
+      "models": [
+        {
+          "modelId": "m",
+          "version": "1",
+          "state": "INSTALLED",
+          "downloadBytes": 100,
+          "expandedBytes": 200,
+          "licenseRef": "license-ref",
+          "task": "TTS",
+          "languages": [
+            "vi"
+          ],
+          "compatible": true
+        }
+      ],
+      "nextPageToken": null
+    }
+  },
+  {
+    "name": "voices-page-unknown",
+    "message": {
+      "major": 2,
+      "type": "VOICES",
+      "requestId": "r",
+      "voices": [
+        {
+          "id": "v",
+          "modelId": "m",
+          "version": "1",
+          "language": "vi",
+          "displayName": "Voice",
+          "accent": "UNKNOWN",
+          "gender": "UNKNOWN",
+          "verifiedMetadata": false,
+          "supportedRateModes": [
+            "NATURAL"
+          ],
+          "outputMode": "FULL_UTTERANCE"
+        }
+      ],
+      "nextPageToken": null
+    }
+  },
+  {
+    "name": "caps-unavailable",
+    "message": {
+      "major": 2,
+      "type": "CAPABILITIES",
+      "requestId": "r",
+      "protocolMajor": 2,
+      "minor": 0,
+      "state": "MODEL_MISSING",
+      "limits": {
+        "maxPayloadUtf16Units": 16384,
+        "maxBundleBytes": 65536,
+        "maxCues": 16,
+        "maxTextUtf16Units": 512,
+        "maxIdUtf16Units": 80,
+        "maxPageSize": 16,
+        "maxInstalledVersions": 64,
+        "maxReadyModels": 1
+      },
+      "supportedInputs": [
+        "DIRECT_TEXT"
+      ],
+      "translationPairs": [],
+      "speechLanguages": [],
+      "aiVoice": false,
+      "offline": false,
+      "multiSpeaker": false,
+      "lookahead": false,
+      "clientHoldSupported": false,
+      "engine": "unavailable",
+      "installedModels": []
+    }
+  },
+  {
+    "name": "caps-ready",
+    "message": {
+      "major": 2,
+      "type": "CAPABILITIES",
+      "requestId": "r",
+      "protocolMajor": 2,
+      "minor": 0,
+      "state": "READY",
+      "limits": {
+        "maxPayloadUtf16Units": 16384,
+        "maxBundleBytes": 65536,
+        "maxCues": 16,
+        "maxTextUtf16Units": 512,
+        "maxIdUtf16Units": 80,
+        "maxPageSize": 16,
+        "maxInstalledVersions": 64,
+        "maxReadyModels": 1
+      },
+      "supportedInputs": [
+        "DIRECT_TEXT"
+      ],
+      "translationPairs": [],
+      "speechLanguages": [
+        "vi"
+      ],
+      "aiVoice": true,
+      "offline": true,
+      "multiSpeaker": false,
+      "lookahead": true,
+      "clientHoldSupported": false,
+      "engine": "local-engine",
+      "installedModels": [
+        {
+          "modelId": "m",
+          "version": "1",
+          "state": "READY"
+        }
+      ]
+    }
+  },
+  {
+    "name": "speech-start",
+    "message": {
+      "major": 2,
+      "type": "SPEECH_STARTED",
+      "sessionId": "s",
+      "revision": 0,
+      "eventSeq": 1,
+      "speechId": "sp",
+      "cueId": "c",
+      "segmentIndex": 0,
+      "modelVersion": "1"
+    }
+  },
+  {
+    "name": "speech-finish",
+    "message": {
+      "major": 2,
+      "type": "SPEECH_FINISHED",
+      "sessionId": "s",
+      "revision": 0,
+      "eventSeq": 2,
+      "speechId": "sp",
+      "cueId": "c",
+      "segmentIndex": 0,
+      "modelVersion": "1",
+      "reason": "COMPLETED"
+    }
+  },
+  {
+    "name": "cue-rejected",
+    "message": {
+      "major": 2,
+      "type": "REJECTED_CUE",
+      "sessionId": "s",
+      "revision": 0,
+      "eventSeq": 3,
+      "cueId": "c",
+      "reason": "EXPIRED"
+    }
+  }
+]

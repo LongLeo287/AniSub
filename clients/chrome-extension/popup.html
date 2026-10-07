@@ -1,0 +1,8 @@
+<!doctype html><html lang="vi"><meta charset="utf-8"><link rel="stylesheet" href="popup.css">
+<body><h1>AniSub</h1><p>Chọn video trên tab hiện tại. Chỉ phụ đề được gửi đến app Windows trên máy; không thu âm hoặc hình.</p>
+<label>Video <select id="video"></select></label>
+<label>Phụ đề <select id="track"></select></label>
+<p id="consent">Bắt đầu = đồng ý gửi chữ phụ đề để dịch EN→VI / đọc VI. Giọng theo cấu hình app Windows.</p>
+<button id="start" disabled>Bắt đầu thuyết minh</button><button id="stop">Dừng và khôi phục âm lượng</button>
+<p id="status" role="status"></p><small>Hỗ trợ video HTML5 và TextTrack VI/EN ở trang chính. Video trong iframe, phụ đề vẽ trong hình, trang được bảo vệ có thể không hỗ trợ.</small>
+<script src="popup.js"></script></body></html>

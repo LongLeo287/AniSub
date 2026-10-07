@@ -1,0 +1,12 @@
+{
+  "name": "anisub-fake-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "check": "node scripts/check.mjs",
+    "test": "node scripts/test.mjs",
+    "demo": "node apps/desktop/harness/demo.mjs"
+  }
+}

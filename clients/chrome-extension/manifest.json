@@ -1,0 +1,9 @@
+{
+  "manifest_version": 3,
+  "name": "AniSub — thuyết minh video",
+  "version": "0.1.0",
+  "description": "Chỉ gửi phụ đề video bạn chọn đến AniSub Windows chạy trên máy.",
+  "permissions": ["activeTab", "scripting", "nativeMessaging"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_popup": "popup.html", "default_title": "Chọn video cho AniSub" }
+}

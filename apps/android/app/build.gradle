@@ -1,0 +1,81 @@
+plugins { id 'com.android.application' }
+
+import groovy.json.JsonSlurper
+import java.security.MessageDigest
+
+// Native payload: sherpa-onnx JNI per ABI, pinned in native-artifacts.json and fetched by
+// tools/fetch-native.ps1 into native/jniLibs (Git-ignored). Release ABIs: armeabi-v7a + arm64-v8a.
+// x86 is for the emulator only:  gradlew ... -PemulatorAbi=x86
+def nativeSpec = new JsonSlurper().parse(rootProject.file('native-artifacts.json'))
+def emulatorAbi = project.findProperty('emulatorAbi')
+def releaseAbis = ['armeabi-v7a', 'arm64-v8a']
+def packagedAbis = emulatorAbi ? releaseAbis + [emulatorAbi.toString()] : releaseAbis
+
+// Optional local release signing (owner only). keystore.properties is Git-ignored and never
+// shipped: storeFile, storePassword, keyAlias, keyPassword. Without it the release is unsigned
+// and the owner signs with apksigner (--v1-signing-enabled true --v2-signing-enabled true).
+def keystoreProps = new Properties()
+def keystoreFile = rootProject.file('keystore.properties')
+if (keystoreFile.isFile()) keystoreFile.withInputStream { keystoreProps.load(it) }
+
+android {
+    namespace 'com.anisub.runtime'
+    compileSdk 36
+    buildFeatures { buildConfig true }
+    // v1 (JAR) + v2 explicitly: Android 6 (minSdk 23, P650 class) cannot install v2-only APKs and
+    // AniBox's installer verifies readable signers.
+    signingConfigs {
+        debug { enableV1Signing true; enableV2Signing true }
+        if (keystoreProps['storeFile']) {
+            release {
+                storeFile rootProject.file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+                enableV1Signing true; enableV2Signing true
+            }
+        }
+    }
+    defaultConfig {
+        applicationId 'com.anisub.runtime'
+        minSdk 23
+        targetSdk 34
+        versionCode 2
+        versionName '0.2.0'
+        ndk { abiFilters(*packagedAbis) }
+    }
+    sourceSets { main { jniLibs.srcDirs = [rootProject.file('native/jniLibs')] } }
+    // Compressed .so in the APK keeps the Downloader/AniBox download small (extracted on install).
+    packaging { jniLibs { useLegacyPackaging = true } }
+    buildTypes {
+        // Release signing only via the owner's local keystore.properties; otherwise unsigned.
+        debug { signingConfig signingConfigs.debug }
+        release {
+            minifyEnabled false
+            if (keystoreProps['storeFile']) signingConfig signingConfigs.release
+        }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }
+    // UsableSpace: the store deliberately uses the conservative usable-space figure.
+    lint { disable 'ExpiredTargetSdkVersion', 'OldTargetApi', 'UsableSpace' }
+    testOptions { unitTests.returnDefaultValues = false }
+}
+
+// Refuse to package unverified native code: every packaged .so must match its pinned digest.
+tasks.register('verifyNativeLibs') {
+    inputs.file(rootProject.file('native-artifacts.json'))
+    doLast {
+        nativeSpec.libraries.findAll { packagedAbis.contains(it.abi) }.each { lib ->
+            def f = rootProject.file("native/jniLibs/${lib.abi}/${lib.file}")
+            if (!f.isFile()) throw new GradleException("Missing ${lib.abi}/${lib.file}: run tools/fetch-native.ps1")
+            def digest = MessageDigest.getInstance('SHA-256').digest(f.bytes).encodeHex().toString()
+            if (f.length() != (lib.bytes as long) || digest != lib.sha256) throw new GradleException("SHA-256 mismatch for ${lib.abi}/${lib.file}")
+        }
+    }
+}
+tasks.named('preBuild') { dependsOn 'verifyNativeLibs' }
+
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20240303'
+}

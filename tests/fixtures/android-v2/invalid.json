@@ -1,0 +1,993 @@
+[
+  {
+    "name": "legacy-major",
+    "code": "PROTOCOL_MISMATCH",
+    "message": {
+      "major": 1,
+      "type": "HELLO",
+      "requestId": "r",
+      "minor": 0
+    }
+  },
+  {
+    "name": "unknown-command",
+    "code": "UNSUPPORTED",
+    "message": {
+      "major": 2,
+      "type": "EXECUTE",
+      "requestId": "r"
+    }
+  },
+  {
+    "name": "unknown-minor",
+    "code": "UNSUPPORTED",
+    "message": {
+      "major": 2,
+      "type": "HELLO",
+      "requestId": "r",
+      "minor": 1
+    }
+  },
+  {
+    "name": "missing-request",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "HELLO",
+      "minor": 0
+    }
+  },
+  {
+    "name": "wrong-major-type",
+    "code": "MALFORMED",
+    "message": {
+      "major": "2",
+      "type": "HELLO",
+      "requestId": "r",
+      "minor": 0
+    }
+  },
+  {
+    "name": "missing-minor",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "HELLO",
+      "requestId": "r"
+    }
+  },
+  {
+    "name": "null-clock",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "PLAY",
+      "requestId": "r",
+      "sessionId": "s",
+      "revision": 0,
+      "seq": 1,
+      "clock": null
+    }
+  },
+  {
+    "name": "missing-playing",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "PLAY",
+      "requestId": "r",
+      "sessionId": "s",
+      "revision": 0,
+      "seq": 1,
+      "clock": {
+        "positionMs": 0,
+        "sampledAtElapsedMs": 0,
+        "speed": 1
+      }
+    }
+  },
+  {
+    "name": "boolean-as-string",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "PLAY",
+      "requestId": "r",
+      "sessionId": "s",
+      "revision": 0,
+      "seq": 1,
+      "clock": {
+        "positionMs": 0,
+        "sampledAtElapsedMs": 0,
+        "playing": "true",
+        "speed": 1
+      }
+    }
+  },
+  {
+    "name": "unsafe-integer",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "CLOSE",
+      "requestId": "r",
+      "sessionId": "s",
+      "revision": 9007199254740992,
+      "seq": 1
+    }
+  },
+  {
+    "name": "fractional-revision",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "CLOSE",
+      "requestId": "r",
+      "sessionId": "s",
+      "revision": 0.5,
+      "seq": 1
+    }
+  },
+  {
+    "name": "seq-zero",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "CLOSE",
+      "requestId": "r",
+      "sessionId": "s",
+      "revision": 0,
+      "seq": 0
+    }
+  },
+  {
+    "name": "consent-false",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "DOWNLOAD_MODEL",
+      "requestId": "r",
+      "modelId": "m",
+      "version": "1",
+      "consent": false
+    }
+  },
+  {
+    "name": "missing-model",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "PREPARE_MODEL",
+      "requestId": "r",
+      "version": "1"
+    }
+  },
+  {
+    "name": "missing-operation",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "CANCEL_DOWNLOAD",
+      "requestId": "r"
+    }
+  },
+  {
+    "name": "page-overflow",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "LIST_MODELS",
+      "requestId": "r",
+      "pageSize": 17
+    }
+  },
+  {
+    "name": "explicit-null-selection",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "SET_SETTINGS",
+      "requestId": "r",
+      "expectedSettingsRevision": 0,
+      "settings": {
+        "voiceMode": "EXPLICIT",
+        "modelId": null,
+        "modelVersion": null,
+        "voiceId": null,
+        "targetLanguage": "vi",
+        "rateMode": "AUTO",
+        "deliveryMode": "LIVE_BOUNDED"
+      }
+    }
+  },
+  {
+    "name": "unknown-voice-mode",
+    "code": "UNSUPPORTED",
+    "message": {
+      "major": 2,
+      "type": "SET_SETTINGS",
+      "requestId": "r",
+      "expectedSettingsRevision": 0,
+      "settings": {
+        "voiceMode": "CLONE",
+        "modelId": null,
+        "modelVersion": null,
+        "voiceId": null,
+        "targetLanguage": "vi",
+        "rateMode": "AUTO",
+        "deliveryMode": "LIVE_BOUNDED"
+      }
+    }
+  },
+  {
+    "name": "missing-nullable-field",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "SET_SETTINGS",
+      "requestId": "r",
+      "expectedSettingsRevision": 0,
+      "settings": {
+        "voiceMode": "AUTO",
+        "modelVersion": null,
+        "voiceId": null,
+        "targetLanguage": "vi",
+        "rateMode": "AUTO",
+        "deliveryMode": "LIVE_BOUNDED"
+      }
+    }
+  },
+  {
+    "name": "translation-not-implemented",
+    "code": "UNSUPPORTED_TRANSLATION",
+    "message": {
+      "major": 2,
+      "type": "OPEN",
+      "requestId": "r",
+      "sessionId": "s",
+      "revision": 0,
+      "seq": 1,
+      "episodeRef": "e",
+      "sourceRef": "src",
+      "trackRef": "t",
+      "inputMode": "DIRECT_TEXT",
+      "trackAvailability": "TEXT_TRACK",
+      "originalLanguage": "vi",
+      "targetLanguage": "en",
+      "settingsRevision": 0,
+      "modelId": "m",
+      "version": "1",
+      "voiceId": "v",
+      "speechEnabled": true,
+      "clock": {
+        "positionMs": 0,
+        "sampledAtElapsedMs": 10,
+        "playing": true,
+        "speed": 1
+      }
+    }
+  },
+  {
+    "name": "legacy-minus-one",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "CUE_SNAPSHOT",
+      "requestId": "r",
+      "sessionId": "s",
+      "revision": 0,
+      "seq": 1,
+      "cues": [
+        {
+          "cueId": "c",
+          "originalText": "x",
+          "language": "vi",
+          "observedAtMediaMs": 0,
+          "startMs": null,
+          "endMs": -1,
+          "origin": "DIRECT",
+          "role": "UNKNOWN",
+          "trackRef": "t"
+        }
+      ]
+    }
+  },
+  {
+    "name": "missing-unknown-time",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "CUE_SNAPSHOT",
+      "requestId": "r",
+      "sessionId": "s",
+      "revision": 0,
+      "seq": 1,
+      "cues": [
+        {
+          "cueId": "c",
+          "originalText": "x",
+          "language": "vi",
+          "observedAtMediaMs": 0,
+          "endMs": null,
+          "origin": "DIRECT",
+          "role": "UNKNOWN",
+          "trackRef": "t"
+        }
+      ]
+    }
+  },
+  {
+    "name": "unknown-role",
+    "code": "UNSUPPORTED",
+    "message": {
+      "major": 2,
+      "type": "CUE_SNAPSHOT",
+      "requestId": "r",
+      "sessionId": "s",
+      "revision": 0,
+      "seq": 1,
+      "cues": [
+        {
+          "cueId": "c",
+          "originalText": "x",
+          "language": "vi",
+          "observedAtMediaMs": 0,
+          "startMs": null,
+          "endMs": null,
+          "origin": "DIRECT",
+          "role": "GUESSED",
+          "trackRef": "t"
+        }
+      ]
+    }
+  },
+  {
+    "name": "unknown-origin",
+    "code": "UNSUPPORTED",
+    "message": {
+      "major": 2,
+      "type": "CUE_SNAPSHOT",
+      "requestId": "r",
+      "sessionId": "s",
+      "revision": 0,
+      "seq": 1,
+      "cues": [
+        {
+          "cueId": "c",
+          "originalText": "x",
+          "language": "vi",
+          "observedAtMediaMs": 0,
+          "startMs": null,
+          "endMs": null,
+          "origin": "OCR",
+          "role": "UNKNOWN",
+          "trackRef": "t"
+        }
+      ]
+    }
+  },
+  {
+    "name": "timeline-unknown-start",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "TIMELINE_BATCH",
+      "requestId": "r",
+      "sessionId": "s",
+      "revision": 0,
+      "seq": 1,
+      "cues": [
+        {
+          "cueId": "c",
+          "originalText": "x",
+          "language": "vi",
+          "observedAtMediaMs": 0,
+          "startMs": null,
+          "endMs": 10,
+          "origin": "DIRECT",
+          "role": "UNKNOWN",
+          "trackRef": "t"
+        }
+      ]
+    }
+  },
+  {
+    "name": "uri-newline",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "CUE_SNAPSHOT",
+      "requestId": "r",
+      "sessionId": "s",
+      "revision": 0,
+      "seq": 1,
+      "cues": [
+        {
+          "cueId": "c",
+          "originalText": "x",
+          "language": "vi",
+          "observedAtMediaMs": 0,
+          "startMs": null,
+          "endMs": null,
+          "origin": "DIRECT",
+          "role": "UNKNOWN",
+          "trackRef": "https://example.com\n"
+        }
+      ]
+    }
+  },
+  {
+    "name": "bare-hello-ack",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "HELLO_ACK",
+      "requestId": "r"
+    }
+  },
+  {
+    "name": "wrong-negotiated-limit",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "HELLO_ACK",
+      "requestId": "r",
+      "minor": 0,
+      "limits": {
+        "maxPayloadUtf16Units": 16384,
+        "maxBundleBytes": 65536,
+        "maxCues": 17,
+        "maxTextUtf16Units": 512,
+        "maxIdUtf16Units": 80,
+        "maxPageSize": 16,
+        "maxInstalledVersions": 64,
+        "maxReadyModels": 1
+      }
+    }
+  },
+  {
+    "name": "missing-settings-value",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "SETTINGS",
+      "requestId": "r",
+      "settingsRevision": 1
+    }
+  },
+  {
+    "name": "missing-conflict-revision",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "ERROR",
+      "requestId": "r",
+      "code": "SETTINGS_CONFLICT",
+      "recoverable": true,
+      "settings": {
+        "voiceMode": "AUTO",
+        "modelId": null,
+        "modelVersion": null,
+        "voiceId": null,
+        "targetLanguage": "vi",
+        "rateMode": "AUTO",
+        "deliveryMode": "LIVE_BOUNDED"
+      }
+    }
+  },
+  {
+    "name": "missing-error-code",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "ERROR",
+      "requestId": "r",
+      "recoverable": true
+    }
+  },
+  {
+    "name": "missing-progress-op",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "MODEL_PROGRESS",
+      "bytesTransferred": 0,
+      "expectedBytes": 1
+    }
+  },
+  {
+    "name": "wrong-progress-type",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "MODEL_PROGRESS",
+      "operationId": "op",
+      "bytesTransferred": "0",
+      "expectedBytes": 1
+    }
+  },
+  {
+    "name": "missing-model-state",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "MODEL_STATE",
+      "modelId": "m",
+      "version": "1"
+    }
+  },
+  {
+    "name": "unknown-model-state",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "MODEL_STATE",
+      "modelId": "m",
+      "version": "1",
+      "state": "MAGIC"
+    }
+  },
+  {
+    "name": "model-error-no-reason",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "MODEL_STATE",
+      "modelId": "m",
+      "version": "1",
+      "state": "ERROR"
+    }
+  },
+  {
+    "name": "models-no-page-end",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "MODELS",
+      "requestId": "r",
+      "models": []
+    }
+  },
+  {
+    "name": "model-page-17",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "MODELS",
+      "requestId": "r",
+      "models": [
+        {
+          "modelId": "m0",
+          "version": "1",
+          "state": "INSTALLED",
+          "downloadBytes": 100,
+          "expandedBytes": 200,
+          "licenseRef": "license-ref",
+          "task": "TTS",
+          "languages": [
+            "vi"
+          ],
+          "compatible": true
+        },
+        {
+          "modelId": "m1",
+          "version": "1",
+          "state": "INSTALLED",
+          "downloadBytes": 100,
+          "expandedBytes": 200,
+          "licenseRef": "license-ref",
+          "task": "TTS",
+          "languages": [
+            "vi"
+          ],
+          "compatible": true
+        },
+        {
+          "modelId": "m2",
+          "version": "1",
+          "state": "INSTALLED",
+          "downloadBytes": 100,
+          "expandedBytes": 200,
+          "licenseRef": "license-ref",
+          "task": "TTS",
+          "languages": [
+            "vi"
+          ],
+          "compatible": true
+        },
+        {
+          "modelId": "m3",
+          "version": "1",
+          "state": "INSTALLED",
+          "downloadBytes": 100,
+          "expandedBytes": 200,
+          "licenseRef": "license-ref",
+          "task": "TTS",
+          "languages": [
+            "vi"
+          ],
+          "compatible": true
+        },
+        {
+          "modelId": "m4",
+          "version": "1",
+          "state": "INSTALLED",
+          "downloadBytes": 100,
+          "expandedBytes": 200,
+          "licenseRef": "license-ref",
+          "task": "TTS",
+          "languages": [
+            "vi"
+          ],
+          "compatible": true
+        },
+        {
+          "modelId": "m5",
+          "version": "1",
+          "state": "INSTALLED",
+          "downloadBytes": 100,
+          "expandedBytes": 200,
+          "licenseRef": "license-ref",
+          "task": "TTS",
+          "languages": [
+            "vi"
+          ],
+          "compatible": true
+        },
+        {
+          "modelId": "m6",
+          "version": "1",
+          "state": "INSTALLED",
+          "downloadBytes": 100,
+          "expandedBytes": 200,
+          "licenseRef": "license-ref",
+          "task": "TTS",
+          "languages": [
+            "vi"
+          ],
+          "compatible": true
+        },
+        {
+          "modelId": "m7",
+          "version": "1",
+          "state": "INSTALLED",
+          "downloadBytes": 100,
+          "expandedBytes": 200,
+          "licenseRef": "license-ref",
+          "task": "TTS",
+          "languages": [
+            "vi"
+          ],
+          "compatible": true
+        },
+        {
+          "modelId": "m8",
+          "version": "1",
+          "state": "INSTALLED",
+          "downloadBytes": 100,
+          "expandedBytes": 200,
+          "licenseRef": "license-ref",
+          "task": "TTS",
+          "languages": [
+            "vi"
+          ],
+          "compatible": true
+        },
+        {
+          "modelId": "m9",
+          "version": "1",
+          "state": "INSTALLED",
+          "downloadBytes": 100,
+          "expandedBytes": 200,
+          "licenseRef": "license-ref",
+          "task": "TTS",
+          "languages": [
+            "vi"
+          ],
+          "compatible": true
+        },
+        {
+          "modelId": "m10",
+          "version": "1",
+          "state": "INSTALLED",
+          "downloadBytes": 100,
+          "expandedBytes": 200,
+          "licenseRef": "license-ref",
+          "task": "TTS",
+          "languages": [
+            "vi"
+          ],
+          "compatible": true
+        },
+        {
+          "modelId": "m11",
+          "version": "1",
+          "state": "INSTALLED",
+          "downloadBytes": 100,
+          "expandedBytes": 200,
+          "licenseRef": "license-ref",
+          "task": "TTS",
+          "languages": [
+            "vi"
+          ],
+          "compatible": true
+        },
+        {
+          "modelId": "m12",
+          "version": "1",
+          "state": "INSTALLED",
+          "downloadBytes": 100,
+          "expandedBytes": 200,
+          "licenseRef": "license-ref",
+          "task": "TTS",
+          "languages": [
+            "vi"
+          ],
+          "compatible": true
+        },
+        {
+          "modelId": "m13",
+          "version": "1",
+          "state": "INSTALLED",
+          "downloadBytes": 100,
+          "expandedBytes": 200,
+          "licenseRef": "license-ref",
+          "task": "TTS",
+          "languages": [
+            "vi"
+          ],
+          "compatible": true
+        },
+        {
+          "modelId": "m14",
+          "version": "1",
+          "state": "INSTALLED",
+          "downloadBytes": 100,
+          "expandedBytes": 200,
+          "licenseRef": "license-ref",
+          "task": "TTS",
+          "languages": [
+            "vi"
+          ],
+          "compatible": true
+        },
+        {
+          "modelId": "m15",
+          "version": "1",
+          "state": "INSTALLED",
+          "downloadBytes": 100,
+          "expandedBytes": 200,
+          "licenseRef": "license-ref",
+          "task": "TTS",
+          "languages": [
+            "vi"
+          ],
+          "compatible": true
+        },
+        {
+          "modelId": "m16",
+          "version": "1",
+          "state": "INSTALLED",
+          "downloadBytes": 100,
+          "expandedBytes": 200,
+          "licenseRef": "license-ref",
+          "task": "TTS",
+          "languages": [
+            "vi"
+          ],
+          "compatible": true
+        }
+      ],
+      "nextPageToken": null
+    }
+  },
+  {
+    "name": "unverified-accent",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "VOICES",
+      "requestId": "r",
+      "voices": [
+        {
+          "id": "v",
+          "modelId": "m",
+          "version": "1",
+          "language": "vi",
+          "displayName": "Voice",
+          "accent": "NORTH",
+          "gender": "UNKNOWN",
+          "verifiedMetadata": false,
+          "supportedRateModes": [
+            "NATURAL"
+          ],
+          "outputMode": "FULL_UTTERANCE"
+        }
+      ],
+      "nextPageToken": null
+    }
+  },
+  {
+    "name": "voice-missing-gender",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "VOICES",
+      "requestId": "r",
+      "voices": [
+        {
+          "id": "v",
+          "modelId": "m",
+          "version": "1",
+          "language": "vi",
+          "displayName": "Voice",
+          "accent": "UNKNOWN",
+          "verifiedMetadata": false,
+          "supportedRateModes": [
+            "NATURAL"
+          ],
+          "outputMode": "FULL_UTTERANCE"
+        }
+      ],
+      "nextPageToken": null
+    }
+  },
+  {
+    "name": "caps-missing-engine",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "CAPABILITIES",
+      "requestId": "r",
+      "protocolMajor": 2,
+      "minor": 0,
+      "state": "MODEL_MISSING",
+      "limits": {
+        "maxPayloadUtf16Units": 16384,
+        "maxBundleBytes": 65536,
+        "maxCues": 16,
+        "maxTextUtf16Units": 512,
+        "maxIdUtf16Units": 80,
+        "maxPageSize": 16,
+        "maxInstalledVersions": 64,
+        "maxReadyModels": 1
+      },
+      "supportedInputs": [
+        "DIRECT_TEXT"
+      ],
+      "translationPairs": [],
+      "speechLanguages": [],
+      "aiVoice": false,
+      "offline": false,
+      "multiSpeaker": false,
+      "lookahead": false,
+      "clientHoldSupported": false,
+      "installedModels": []
+    }
+  },
+  {
+    "name": "caps-two-ready",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "CAPABILITIES",
+      "requestId": "r",
+      "protocolMajor": 2,
+      "minor": 0,
+      "state": "READY",
+      "limits": {
+        "maxPayloadUtf16Units": 16384,
+        "maxBundleBytes": 65536,
+        "maxCues": 16,
+        "maxTextUtf16Units": 512,
+        "maxIdUtf16Units": 80,
+        "maxPageSize": 16,
+        "maxInstalledVersions": 64,
+        "maxReadyModels": 1
+      },
+      "supportedInputs": [
+        "DIRECT_TEXT"
+      ],
+      "translationPairs": [],
+      "speechLanguages": [],
+      "aiVoice": false,
+      "offline": false,
+      "multiSpeaker": false,
+      "lookahead": false,
+      "clientHoldSupported": false,
+      "engine": "unavailable",
+      "installedModels": [
+        {
+          "modelId": "a",
+          "version": "1",
+          "state": "READY"
+        },
+        {
+          "modelId": "b",
+          "version": "1",
+          "state": "READY"
+        }
+      ]
+    }
+  },
+  {
+    "name": "speech-event-no-seq",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "SPEECH_STARTED",
+      "sessionId": "s",
+      "revision": 0,
+      "speechId": "sp",
+      "cueId": "c",
+      "segmentIndex": 0,
+      "modelVersion": "1"
+    }
+  },
+  {
+    "name": "invalid-terminal",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "SPEECH_FINISHED",
+      "sessionId": "s",
+      "revision": 0,
+      "eventSeq": 1,
+      "speechId": "sp",
+      "cueId": "c",
+      "segmentIndex": 0,
+      "modelVersion": "1",
+      "reason": "RAW TEXT"
+    }
+  },
+  {
+    "name": "catalog-missing-size",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "MODELS",
+      "requestId": "r",
+      "models": [
+        {
+          "modelId": "m",
+          "version": "1",
+          "state": "INSTALLED",
+          "downloadBytes": null,
+          "expandedBytes": 200,
+          "licenseRef": "license-ref",
+          "task": "TTS",
+          "languages": [
+            "vi"
+          ],
+          "compatible": true
+        }
+      ],
+      "nextPageToken": null
+    }
+  },
+  {
+    "name": "catalog-missing-license",
+    "code": "MALFORMED",
+    "message": {
+      "major": 2,
+      "type": "MODELS",
+      "requestId": "r",
+      "models": [
+        {
+          "modelId": "m",
+          "version": "1",
+          "state": "INSTALLED",
+          "downloadBytes": 100,
+          "expandedBytes": 200,
+          "licenseRef": null,
+          "task": "TTS",
+          "languages": [
+            "vi"
+          ],
+          "compatible": true
+        }
+      ],
+      "nextPageToken": null
+    }
+  }
+]

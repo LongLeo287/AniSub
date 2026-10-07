@@ -1,0 +1,29 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <!-- Only for the user-consented voice-pack download from the settings screen. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Kept defined for compatibility, but NOT required by the service or activity: AniBox is
+         usually installed before AniSub, so it could never be granted. Callers are verified at
+         runtime by UID, exact package com.anibox.tv and same signing certificate. -->
+    <permission android:name="com.anisub.runtime.BIND" android:protectionLevel="signature" />
+    <queries><package android:name="com.anibox.tv" /><intent><action android:name="android.intent.action.TTS_SERVICE" /></intent></queries>
+    <application android:allowBackup="false" android:dataExtractionRules="@xml/data_extraction_rules" android:label="AniSub" android:icon="@drawable/ic_anisub"
+        android:banner="@drawable/banner" android:supportsRtl="true" android:usesCleartextTraffic="false" tools:ignore="DataExtractionRules"
+        android:theme="@android:style/Theme.Material.NoActionBar">
+        <activity android:name=".SettingsActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.anisub.runtime.action.SETTINGS" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+        <!-- Intentionally no android:permission (see the install-order note above). Every message is
+             authorized in AniSubService before its Bundle is read. -->
+        <service android:name=".AniSubService" android:exported="true" tools:ignore="ExportedService" />
+    </application>
+</manifest>

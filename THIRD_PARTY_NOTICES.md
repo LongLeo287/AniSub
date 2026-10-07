@@ -1,0 +1,36 @@
+# Third-party notices
+
+AniSub is licensed under GPL-3.0-or-later (see `LICENSE`). It includes or downloads the following
+third-party components. No third-party model data is stored in this repository.
+
+## Bundled in the Android APK
+
+| Component | Version | License | Source |
+|---|---|---|---|
+| sherpa-onnx (`libsherpa-onnx-jni.so`, Android build with statically linked ONNX Runtime) | 1.13.8 | Apache-2.0 | https://github.com/k2-fsa/sherpa-onnx/tree/v1.13.8 |
+| ONNX Runtime (statically linked) | as pinned by sherpa-onnx 1.13.8 `cmake/onnxruntime*.cmake` | MIT | https://github.com/microsoft/onnxruntime |
+| espeak-ng, piper fork (statically linked) | as pinned by `cmake/espeak-ng-for-piper.cmake` | GPL-3.0-or-later | https://github.com/espeak-ng/espeak-ng |
+| piper-phonemize | as pinned by `cmake/piper-phonemize.cmake` | MIT | https://github.com/rhasspy/piper-phonemize |
+| kaldi-native-fbank, kaldi-decoder, kaldifst, OpenFst, simple-sentencepiece | as pinned in `cmake/` | Apache-2.0 | see sherpa-onnx `cmake/` |
+| nlohmann/json; Eigen | as pinned in `cmake/` | MIT; MPL-2.0 | see sherpa-onnx `cmake/` |
+| Java JNI binding `com.k2fsa.sherpa.onnx.*` (trimmed, modified) | derived from 1.13.8 java-api | Apache-2.0, Copyright 2024 Xiaomi Corporation | `apps/android/app/src/main/java/com/k2fsa/sherpa/onnx/` |
+
+The native libraries are not committed: `apps/android/tools/fetch-native.ps1` downloads the
+official release archive and verifies it against `apps/android/native-artifacts.json`. Corresponding
+source for the binaries is the sherpa-onnx v1.13.8 tag and the dependency versions pinned in its
+`cmake/` directory.
+
+## Downloaded at runtime after user consent (not in the APK)
+
+| Component | License |
+|---|---|
+| Piper voice `vi_VN-vais1000-medium` (sherpa-onnx ONNX conversion) | MIT (rhasspy/piper-voices) |
+| VAIS-1000 training corpus (attribution) | CC BY 4.0 |
+| espeak-ng-data subset | GPL-3.0-or-later |
+
+Details and caveats: [docs/voices.md](docs/voices.md).
+
+## Windows prototype
+
+The Windows/desktop prototype downloads its own models into the Git-ignored `models/` folder;
+see `docs/windows-app.md` and `model-manager/quality-catalog.json` for their sources and licenses.

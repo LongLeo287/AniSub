@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "maximumNewBytes": 2147483648,
+  "packs": [
+    {"name":"vieneu-turbo-61b85e3","repo":"pnnbao-ump/VieNeu-TTS-v3-Turbo","revision":"61b85e3d937fbbacb387714180e8182823512523","license":"Apache-2.0","files":["README.md","onnx_update/config.json","onnx_update/tokenizer.json","onnx_update/vieneu_acoustic_cached.onnx","onnx_update/vieneu_backbone_shared.data","onnx_update/vieneu_decode_step.onnx","onnx_update/vieneu_prefill.onnx","onnx_update/vieneu_v3_heads.npz"]},
+    {"name":"moss-codec-ceff0d0","repo":"OpenMOSS-Team/MOSS-Audio-Tokenizer-Nano-ONNX","revision":"ceff0d0749bfb3fa2d61149794ec6feef0d1e1ae","license":"Apache-2.0","files":["README.md","codec_browser_onnx_meta.json","moss_audio_tokenizer_decode_full.onnx","moss_audio_tokenizer_decode_shared.data","moss_audio_tokenizer_decode_step.onnx","moss_audio_tokenizer_encode.onnx","moss_audio_tokenizer_encode.data"]},
+    {"name":"whisper-small-536b066","repo":"Systran/faster-whisper-small","revision":"536b0662742c02347bc0e980a01041f333bce120","license":"MIT","files":["README.md","config.json","model.bin","tokenizer.json","vocabulary.txt"]}
+  ],
+  "voiceAssets":{"file":"work/python-deps/vieneu/assets/voices_v3_turbo.json","sdkVersion":"3.8.3","sha256":"e1f13cd2c2e0d29fdab5e15bfd7a30f3d7b768e6132bb43dd2b853f8efefdce9"}
+}
