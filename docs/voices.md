@@ -1,6 +1,7 @@
 # AniSub voice packs (Android)
 
-Packs are model DATA, downloaded on first use after consent; the APK never contains model data
+Packs are model DATA, downloaded after install (the default Vietnamese pack automatically at the first
+run, others on the user's request) through Android's DownloadManager; the APK never contains model data
 and a pack can never carry code (`.so`, `.dex`, scripts are rejected by the manifest validator).
 The catalog is pinned inside the APK (`apps/android/app/src/main/assets/voice-catalog.json`):
 every file has a size, SHA-256 and HTTPS URL on an allowlisted host. Changing a pack requires a

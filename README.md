@@ -12,9 +12,9 @@ Trạng thái 2026-10-07: **host Windows nền chạy model thật**, Chrome com
 OCR Việt/Anh và ASR thu âm riêng tiến trình. Turbo/codec/Whisper/OCR đã tải và xác minh.
 Chrome extension cần nạp/đăng ký bằng thao tác người dùng; chưa kiểm thử trong Chrome đã cài.
 Android: **AniSub cho TV** có giọng thuyết minh AI chạy ngay trên máy (sherpa-onnx + giọng Piper
-`vi_VN-vais1000-medium`), tải gói giọng lần đầu khi người dùng đồng ý, kiểm tra SHA-256, sau đó
+`vi_VN-vais1000-medium`), tự tải gói giọng ngay lần đầu chạy, kiểm tra SHA-256, sau đó
 chạy offline; giao thức Messenger major 1 / minor 2 với AniBox cùng chữ ký. Từ 0.3.0: phụ đề khác
-ngôn ngữ giọng đọc được dịch ngay trên TV (ML Kit Translate, tải mô hình khi đồng ý) và có thêm giọng
+ngôn ngữ giọng đọc được dịch ngay trên TV (ML Kit Translate; gói dịch tiếng Việt tự tải lần đầu, gói khác tự tải khi cần) và có thêm giọng
 tiếng Anh `en_US-ljspeech-medium` (gói `voices-en-v1`, chờ phát hành). Số đo trên P650
 đang chờ kiểm thử phần cứng. Mã nguồn công khai: https://github.com/LongLeo287/AniSub (GPL-3.0-or-later).
 [Cách dùng video ở ứng dụng riêng](docs/external-desktop.md), [kiểm chứng](docs/full-desktop-validation.md).
@@ -54,8 +54,10 @@ AniSub là phần bổ trợ của AniBox: AniBox phát phim, AniSub đọc ph�
    - Từ AniBox: AniBox tự tải và cài bản chính thức (kiểm tra SHA-256 và chữ ký).
    - Hoặc bằng ứng dụng **Downloader** trên TV, nhập địa chỉ:
      `https://github.com/LongLeo287/AniSub/releases/latest/download/AniSub.apk`
-3. Mở **AniSub** từ màn hình chính TV, chọn **Tải giọng AI** (khoảng 64 MB). Hộp thoại hiển thị
-   dung lượng và giấy phép; chỉ tải khi bạn đồng ý. Sau khi cài xong, bấm **Nghe thử**.
+3. Ngay lần đầu AniSub chạy (AniBox kết nối hoặc bạn mở AniSub), giọng tiếng Việt mặc định (khoảng
+   64 MB, từ GitHub của AniSub) và gói dịch tiếng Việt (khoảng 30 MB, từ máy chủ Google) **tự tải**;
+   mở **AniSub** để xem tiến độ, giấy phép và bấm **Nghe thử**. AniSub không có quyền Internet: mọi tệp
+   được tải bằng trình tải xuống của Android rồi kiểm tra SHA-256. Giọng tiếng Anh là tùy chọn.
 4. Trong AniBox, bật thuyết minh và chọn **Giọng AI (AniSub)**. Khi giọng AI đọc, AniBox tự giảm
    âm lượng phim rồi trả lại khi đọc xong.
 

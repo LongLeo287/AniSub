@@ -457,17 +457,21 @@ public final class SettingsActivity extends Activity {
         if (tr == null || !tr.modelReady(LanguageTags.VI) || host.sessionActive() || trialRunning) return;
         trialRunning = true; trialResult = null; render();
         final long t0 = SystemClock.elapsedRealtime();
-        tr.translate(SAMPLE_EN, LanguageTags.EN, LanguageTags.VI, (result, error) -> runOnUiThread(() -> {
+        // Language identification first (as for "und" subtitles), then translation into Vietnamese.
+        tr.identify(SAMPLE_EN, MlKitTranslation.IDENTIFY_TIMEOUT_MS, (detected, assumed) -> {
+        final String from = LanguageTags.translatable(detected) ? detected : LanguageTags.EN;
+        tr.translate(SAMPLE_EN, from, LanguageTags.VI, (result, error) -> runOnUiThread(() -> {
             trialRunning = false;
             long ms = SystemClock.elapsedRealtime() - t0;
             if (result == null) trialResult = "Không dịch được (" + error + ").";
             else {
-                trialResult = "“" + SAMPLE_EN + "”\n→ “" + result + "”  (" + ms + " ms)";
+                trialResult = "Nhận diện: " + LanguageTags.displayName(detected) + (assumed ? " (giả định)" : "") + "\n“" + SAMPLE_EN + "”\n→ “" + result + "”  (" + ms + " ms)";
                 VoicePackManager.Status s = host.packStatus(LanguageTags.VI);
                 if (s != null && s.ready()) speakWhenReady(LanguageTags.VI, result);
             }
             render();
         }));
+        });
     }
 
     private void onAbout() {

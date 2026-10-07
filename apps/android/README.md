@@ -10,17 +10,19 @@ subtitle file. Shipping wire contract: protocol **major 1 / minor 2**, see
 [docs/android-addon-contract.md](../../docs/android-addon-contract.md) section 3b.
 
 - The APK carries only the native engine (`libsherpa-onnx-jni.so`, armeabi-v7a + arm64-v8a).
-  The voice pack (64.0 MB) is downloaded on first use after an explicit consent dialog (size and
-  license shown), verified file by file with SHA-256, installed atomically into app-private
-  storage, and re-verified before every native load. After that it works offline.
+  The default Vietnamese voice pack (64.0 MB) downloads automatically at the first run (owner
+  07-10-2026; no consent prompt, progress + licence shown in settings); the English pack is a manual
+  download with a consent dialog. Packs are verified file by file with SHA-256, installed atomically
+  into app-private storage, and re-verified before every native load. After that they work offline.
 - ML Kit Translate 17.0.3 + bundled language-id 17.0.6 are in the APK (closed source, owner's
   choice 07-10-2026); translation models (~30 MB download each, 45-65 MB installed) are fetched by
-  ML Kit from Google through the system DownloadManager only after consent in settings, and can be
-  deleted. ML Kit's telemetry backend and start-up providers are removed from the manifest.
+  ML Kit from Google (dl.google.com) through the system DownloadManager: Vietnamese at the first run,
+  others automatically when a session needs them ("Tự tải gói dịch khi cần", default on) or from the
+  settings list; deletable. ML Kit's telemetry backend and start-up providers are removed.
 - No capture, no microphone, no cloud translation or TTS, no paid API. Subtitle text is never
-  logged. Network is used only for consented voice-pack / translation-model downloads (ML Kit
-  itself also contacts Google's Firebase Installations / Remote Config endpoints for model
-  management; see the ANISUB-004 evidence below).
+  logged. AniSub has **no INTERNET permission** (ML Kit's request is removed): all downloads go through
+  Android's DownloadManager, so ML Kit's own in-process Firebase Installations / Remote Config calls
+  cannot connect.
 - Trust: callers are authorized at runtime (sending UID -> package `com.anibox.tv` -> same signing
   certificate). No install-time permission is required, so installing AniBox before AniSub works.
   Debug builds of AniSub (only) also accept `com.anibox.tv.debug` with the same signer check, so
