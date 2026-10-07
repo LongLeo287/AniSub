@@ -2,7 +2,7 @@ AniSub — phần bổ trợ thuyết minh AI cho AniBox
 Giấy phép: GPL-3.0-or-later. Mã nguồn: https://github.com/LongLeo287/AniSub
 
 AniSub không thu âm, không chụp màn hình và không gửi phụ đề ra ngoài. Mạng chỉ được dùng khi
-bạn đồng ý tải gói giọng. Sau khi tải, giọng AI chạy hoàn toàn trên TV.
+bạn đồng ý tải gói giọng hoặc mô hình dịch. Sau khi tải, giọng AI và bản dịch chạy hoàn toàn trên TV.
 
 THÀNH PHẦN BÊN THỨ BA TRONG APK
 
@@ -16,6 +16,11 @@ THÀNH PHẦN BÊN THỨ BA TRONG APK
   - nlohmann/json — MIT; Eigen — MPL-2.0
   Danh sách và phiên bản chính xác của các thư viện con nằm trong thư mục cmake/ của sherpa-onnx
   tại tag v1.13.8; đó cũng là mã nguồn tương ứng của thư viện nhị phân.
+• Google ML Kit Translate 17.0.3 và ML Kit Language Identification 17.0.6 (kèm Google Play services
+  tasks/basement, Firebase components, AndroidX) — phần mềm đóng của Google, theo Điều khoản dịch vụ
+  ML Kit: https://developers.google.com/ml-kit/terms . AniSub tắt phần gửi nhật ký sử dụng của ML Kit
+  (không có backend Firebase datatransport). Mô hình dịch (~30 MB mỗi ngôn ngữ) chỉ được tải từ máy
+  chủ Google khi bạn đồng ý trong mục Dịch phụ đề; dịch chạy trên TV, phụ đề không gửi đi đâu.
 • Các lớp Java com.k2fsa.sherpa.onnx.* được rút gọn từ sherpa-onnx java-api — Apache-2.0
   (Copyright 2024 Xiaomi Corporation).
 
@@ -25,6 +30,10 @@ GÓI GIỌNG (TẢI RIÊNG KHI BẠN ĐỒNG Ý, KHÔNG NẰM TRONG APK)
   Dữ liệu huấn luyện: VAIS-1000 Vietnamese Speech Synthesis Corpus — CC BY 4.0
   https://ieee-dataport.org/documents/vais-1000-vietnamese-speech-synthesis-corpus
   Tinh chỉnh từ giọng en_US-lessac của Piper. Bản ONNX do k2-fsa/sherpa-onnx đóng gói.
+• en_US-ljspeech-medium (Piper) — MIT (rhasspy/piper-voices)
+  Dữ liệu huấn luyện: LJ Speech Dataset — phạm vi công cộng (public domain)
+  https://keithito.com/LJ-Speech-Dataset/ · huấn luyện từ đầu bởi Bryce Beattie (không dựa trên lessac).
+  Bản ONNX do k2-fsa/sherpa-onnx đóng gói.
 • espeak-ng-data (Việt, Anh) — GPL-3.0-or-later.
 
 Toàn văn giấy phép: https://www.gnu.org/licenses/gpl-3.0.html,

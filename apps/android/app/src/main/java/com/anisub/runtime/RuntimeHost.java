@@ -13,6 +13,11 @@ import com.anisub.runtime.ai.SherpaSynthesizer;
 import com.anisub.runtime.models.IntegrityVerifier;
 import com.anisub.runtime.models.ModelStore;
 import com.anisub.runtime.models.StorageBudget;
+import com.anisub.runtime.translate.LanguageTags;
+import com.anisub.runtime.translate.MlKitTranslation;
+import com.anisub.runtime.voice.DebugSources;
+import com.anisub.runtime.voice.EspeakData;
+import com.anisub.runtime.voice.HttpSource;
 import com.anisub.runtime.voice.HttpsSource;
 import com.anisub.runtime.voice.VoiceCatalog;
 import com.anisub.runtime.voice.VoicePackManager;
@@ -21,6 +26,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -40,8 +48,11 @@ public final class RuntimeHost {
     /** Stable across resetStore(): the service/UI subscribe here, not to a specific engine instance. */
     private final CopyOnWriteArrayList<AiSpeechEngine.Listener> engineListeners = new CopyOnWriteArrayList<>();
     private final VoiceCatalog catalog;
+    /** Voice pack manager per voice language ("vi" first); empty when the store is unusable. */
+    private volatile Map<String, VoicePackManager> packs = Collections.emptyMap();
     private VoicePackManager voices;
     private AiSpeechEngine engine;
+    private final MlKitTranslation translation;
     private final RatePolicy rates = new RatePolicy();
     private final String versionName;
     private final long versionCode;
@@ -67,6 +78,7 @@ public final class RuntimeHost {
         } catch (PackageManager.NameNotFoundException ignored) { }
         versionName = name; versionCode = code;
         openStore();
+        translation = new MlKitTranslation(context, this::changed);
     }
 
     @SuppressWarnings("deprecation")
@@ -77,10 +89,17 @@ public final class RuntimeHost {
             File root = new File(app.getFilesDir(), "voices").getCanonicalFile();
             ModelStore store = new ModelStore(root, new StorageBudget(StorageBudget.DEFAULT_QUOTA), new IntegrityVerifier(),
                     System::currentTimeMillis, point -> { });
-            voices = new VoicePackManager(store, catalog, new HttpsSource("AniSub/" + versionName), this::smokeTest, s -> changed());
+            HttpSource source = DebugSources.wrap(new HttpsSource("AniSub/" + versionName), app);
+            Map<String, VoicePackManager> byLanguage = new LinkedHashMap<>();
+            for (String lang : LanguageTags.VOICE) {
+                VoiceCatalog.Pack pack = catalog.forLanguage(lang);
+                if (pack != null) byLanguage.put(lang, new VoicePackManager(store, catalog, pack.id, source, this::smokeTest, s -> changed()));
+            }
+            packs = Collections.unmodifiableMap(byLanguage);
+            voices = byLanguage.get(LanguageTags.VI);
             int threads = Math.max(1, Math.min(2, Runtime.getRuntime().availableProcessors() / 2));
-            engine = new AiSpeechEngine(voices, rates, threads);
-            final VoicePackManager packs = voices;
+            final Map<String, VoicePackManager> resolver = packs;
+            engine = new AiSpeechEngine(resolver::get, rates, threads, espeakRoot());
             engine.addListener(new AiSpeechEngine.Listener() {
                 public void started(String id) { for (AiSpeechEngine.Listener l : engineListeners) l.started(id); }
                 public void finished(String id) { for (AiSpeechEngine.Listener l : engineListeners) l.finished(id); }
@@ -88,29 +107,37 @@ public final class RuntimeHost {
                 public void engineChanged(AiSpeechEngine.State state, String error) {
                     // espeak-ng keeps its first data path per process: after a native load, an
                     // update must not delete the previous pack directory until restart.
-                    if (state == AiSpeechEngine.State.READY) packs.setKeepPreviousUntilRestart(true);
+                    if (state == AiSpeechEngine.State.READY) for (VoicePackManager m : resolver.values()) m.setKeepPreviousUntilRestart(true);
                     for (AiSpeechEngine.Listener l : engineListeners) l.engineChanged(state, error);
                     changed();
                 }
             });
         } catch (IOException | RuntimeException e) {
-            voices = null; engine = null; // store unusable; settings offers a user-initiated reset
+            voices = null; engine = null; packs = Collections.emptyMap(); // store unusable; settings offers a user-initiated reset
         }
     }
+
+    /** Shared espeak-ng data directory (outside the voice store, kept across store resets). */
+    private File espeakRoot() { return new File(app.getFilesDir(), "espeak-ng-data"); }
 
     /** Native smoke test of a freshly installed pack: load + synthesize one short phrase. */
     private String smokeTest(File dir, VoiceCatalog.Pack pack) {
         SherpaSynthesizer s = null;
         try {
-            s = new SherpaSynthesizer(new File(dir, pack.model), new File(dir, pack.tokens), new File(dir, pack.dataDir), 1, pack.voices.get(0).speakerId);
-            float[] pcm = s.synthesize("Xin chào.", 1f, () -> false);
+            File espeak = EspeakData.prepare(espeakRoot(), dir, pack);
+            s = new SherpaSynthesizer(new File(dir, pack.model), new File(dir, pack.tokens), espeak, 1, pack.voices.get(0).speakerId);
+            float[] pcm = s.synthesize(AiSpeechEngine.warmUpText(pack.language), 1f, () -> false);
             return pcm.length > s.sampleRate() / 10 ? null : "INCOMPATIBLE";
         } catch (Throwable t) {
             return "INCOMPATIBLE";
         } finally { if (s != null) s.release(); }
     }
 
+    /** The Vietnamese (minor 1) pack manager, or null when the store is unusable. */
     public VoicePackManager voices() { return voices; }
+    /** The pack manager of a voice language, or null. */
+    public VoicePackManager voices(String language) { return packs.get(language); }
+    public MlKitTranslation translation() { return translation; }
     public AiSpeechEngine engine() { return engine; }
     public VoiceCatalog catalog() { return catalog; }
     public RatePolicy rates() { return rates; }
@@ -132,12 +159,21 @@ public final class RuntimeHost {
     public void setDefaultVoice(String id) { prefs.edit().putString(KEY_VOICE, id).apply(); if (engine != null) engine.setVoice(id); changed(); }
 
     public VoicePackManager.Status packStatus() { return voices == null ? null : voices.status(); }
+    public VoicePackManager.Status packStatus(String language) { VoicePackManager m = packs.get(language); return m == null ? null : m.status(); }
+    /** Status per voice language (null value: store unusable or no pack for it). */
+    public Map<String, VoicePackManager.Status> packStatuses() {
+        Map<String, VoicePackManager.Status> out = new LinkedHashMap<>();
+        for (String lang : LanguageTags.VOICE) out.put(lang, packStatus(lang));
+        return out;
+    }
+    /** True while any pack downloads or verifies. */
+    public boolean anyPackBusy() { for (VoicePackManager m : packs.values()) if (m.busy()) return true; return false; }
     public String engineState() { return engine == null ? "FAILED" : engine.state().name(); }
 
     /** User-initiated recovery when the private store cannot be opened. Only AniSub's own data. */
     public synchronized boolean resetStore() {
         if (engine != null) engine.unload();
-        if (voices != null) voices.shutdown();
+        for (VoicePackManager m : packs.values()) m.shutdown();
         File root = new File(app.getFilesDir(), "voices");
         deleteTree(root, 0);
         openStore();

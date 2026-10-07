@@ -54,6 +54,7 @@ public final class VoicePackManager {
 
     private final ModelStore store;
     private final VoiceCatalog catalog;
+    private final String packId;
     private final HttpSource http;
     private final SmokeTest smoke;
     private final Listener listener;
@@ -67,9 +68,16 @@ public final class VoicePackManager {
     private volatile HttpSource.Response current;
     private boolean busy;
 
+    /** Manager of the catalog's default (Vietnamese, minor 1) pack. */
     public VoicePackManager(ModelStore store, VoiceCatalog catalog, HttpSource http, SmokeTest smoke, Listener listener) {
+        this(store, catalog, catalog == null || catalog.defaultPack() == null ? null : catalog.defaultPack().id, http, smoke, listener);
+    }
+
+    /** Manager of one catalog pack ({@code packId}); several managers may share one store. */
+    public VoicePackManager(ModelStore store, VoiceCatalog catalog, String packId, HttpSource http, SmokeTest smoke, Listener listener) {
         if (store == null || catalog == null || http == null || listener == null) throw new IllegalArgumentException("ports");
         this.store = store; this.catalog = catalog; this.http = http; this.smoke = smoke; this.listener = listener;
+        this.packId = packId;
         refresh();
         cleanupSuperseded();
         synchronized (lock) {
@@ -79,6 +87,10 @@ public final class VoicePackManager {
     }
 
     public VoiceCatalog catalog() { return catalog; }
+    /** The catalog pack this manager installs (null when the catalog lacks it). */
+    public VoiceCatalog.Pack pack() { return packId == null ? null : catalog.find(packId); }
+    /** True while a download/verification of this pack runs. */
+    public boolean busy() { synchronized (lock) { return busy; } }
 
     /**
      * When the native engine has already used a pack in this process, keep the previous version
@@ -88,7 +100,7 @@ public final class VoicePackManager {
 
     public Status status() {
         synchronized (lock) {
-            VoiceCatalog.Pack pack = catalog.defaultPack();
+            VoiceCatalog.Pack pack = pack();
             ModelVersion v = installed();
             String installedVersion = v == null ? null : v.manifest().version;
             boolean update = pack != null && installedVersion != null && !installedVersion.equals(pack.version);
@@ -99,7 +111,7 @@ public final class VoicePackManager {
 
     /** Installed, registry-verified version of the catalog's default pack id (any version). */
     public ModelVersion installed() {
-        VoiceCatalog.Pack pack = catalog.defaultPack();
+        VoiceCatalog.Pack pack = pack();
         if (pack == null) return null;
         ModelVersion best = null;
         for (ModelVersion v : snapshot) {
@@ -111,7 +123,7 @@ public final class VoicePackManager {
     }
 
     private List<ModelVersion> corruptVersions() {
-        VoiceCatalog.Pack pack = catalog.defaultPack();
+        VoiceCatalog.Pack pack = pack();
         List<ModelVersion> out = new ArrayList<>();
         if (pack == null) return out;
         for (ModelVersion v : snapshot) if (v.manifest().id.equals(pack.id) && v.state() == ModelVersion.State.CORRUPT) out.add(v);
@@ -122,7 +134,7 @@ public final class VoicePackManager {
 
     /** Startup: when the catalog version is installed, older versions of the same pack are surplus. */
     private void cleanupSuperseded() {
-        VoiceCatalog.Pack pack = catalog.defaultPack();
+        VoiceCatalog.Pack pack = pack();
         ModelVersion current = installed();
         if (pack == null || current == null || !current.manifest().version.equals(pack.version)) return;
         for (ModelVersion v : snapshot) {
@@ -135,7 +147,7 @@ public final class VoicePackManager {
 
     /** Starts the single allowed download. Requires explicit consent; returns false when busy. */
     public boolean download(boolean consent) {
-        VoiceCatalog.Pack pack = catalog.defaultPack();
+        VoiceCatalog.Pack pack = pack();
         if (!consent || pack == null) return false;
         synchronized (lock) {
             if (busy) return false;

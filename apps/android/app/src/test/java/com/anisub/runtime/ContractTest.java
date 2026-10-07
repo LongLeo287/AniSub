@@ -110,7 +110,9 @@ public class ContractTest {
         assertEquals("VOICE_PACK_MISSING", open("{\"mode\":\"ai\",\"systemTest\":true}", true, false).error);
         OpenRules.Decision d = open("{\"mode\":\"ai\"}", false, true);
         assertTrue(d.accepted()); assertEquals("ai", d.mode); assertEquals(1.0f, d.rate, 0); assertNull(d.voiceId);
-        assertEquals("UNSUPPORTED", OpenRules.decide(new JSONObject("{\"mode\":\"ai\"}"), "en", true, true, VOICES, 1f).error);
+        // Minor 2: a non-Vietnamese source is translated; with no translation engine OPEN says so
+        // (minor 1 answered UNSUPPORTED here; a minor-1 client never got this language accepted).
+        assertEquals("TRANSLATE_UNAVAILABLE", OpenRules.decide(new JSONObject("{\"mode\":\"ai\"}"), "en", true, true, VOICES, 1f).error);
     }
 
     @Test public void rateAndVoiceAreValidated() throws Exception {
@@ -132,12 +134,12 @@ public class ContractTest {
         return VoiceCatalog.parse(new String(Files.readAllBytes(Paths.get("src/main/assets/voice-catalog.json")), StandardCharsets.UTF_8));
     }
 
-    @Test public void capabilitiesKeepMinor0FieldsAndAddMinor1() throws Exception {
+    @Test public void capabilitiesKeepMinor0AndMinor1Fields() throws Exception {
         VoiceCatalog.Pack pack = bundled().defaultPack();
         VoicePackManager.Status none = new VoicePackManager.Status(VoicePackManager.State.NONE, pack, null, 0, pack.totalBytes, null, false);
         JSONObject c = Capabilities.build(true, "local-vietnamese-ready", none, "IDLE", "0.2.0", 2);
         assertEquals("CAPABILITIES", c.getString("type"));
-        assertEquals(1, c.getInt("major")); assertEquals(1, c.getInt("minor")); assertEquals(1, c.getInt("protocolMajor"));
+        assertEquals(1, c.getInt("major")); assertEquals(2, c.getInt("minor")); assertEquals(1, c.getInt("protocolMajor"));
         assertTrue(c.getBoolean("directText")); assertTrue(c.getBoolean("tts")); assertTrue(c.getBoolean("offline"));
         assertFalse(c.getBoolean("aiVoice")); assertFalse(c.getBoolean("translation")); assertFalse(c.getBoolean("multiSpeaker"));
         assertEquals("android-system-tts", c.getString("engine"));

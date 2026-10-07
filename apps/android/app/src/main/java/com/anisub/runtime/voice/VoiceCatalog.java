@@ -23,6 +23,8 @@ public final class VoiceCatalog {
             "github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com",
             "huggingface.co", "cdn-lfs.huggingface.co", "cdn-lfs.hf.co", "cas-bridge.xethub.hf.co")));
     public static final long MAX_PACK_BYTES = 512L << 20;
+    /** Voice languages a pack may speak (protocol minor 2 voiceLang). */
+    public static final Set<String> LANGUAGES = Collections.unmodifiableSet(new HashSet<>(Arrays.asList("vi", "en")));
 
     public static final class Voice {
         public final String id, name, gender, accent; public final int speakerId;
@@ -38,7 +40,7 @@ public final class VoiceCatalog {
     }
     public static final class Pack {
         public final String id, version, name, language, engine, license, licenseUrl, attribution;
-        public final String model, tokens, dataDir;
+        public final String model, tokens, dataDir, release;
         public final int sampleRate;
         public final List<Voice> voices;
         public final List<PackFile> files;
@@ -50,7 +52,8 @@ public final class VoiceCatalog {
             licenseUrl = https(o.getString("licenseUrl"), false); attribution = text(o.getString("attribution"), 1200);
             model = o.getString("model"); tokens = o.getString("tokens"); dataDir = o.getString("dataDir");
             sampleRate = o.getInt("sampleRate");
-            if (!"vi".equals(language) || !"sherpa-onnx-vits".equals(engine) || sampleRate < 8000 || sampleRate > 48000)
+            release = id(o.optString("release", "voices-v1"));
+            if (!LANGUAGES.contains(language) || !"sherpa-onnx-vits".equals(engine) || sampleRate < 8000 || sampleRate > 48000)
                 throw new JSONException("unsupported pack");
             List<Voice> vs = new ArrayList<>(); JSONArray va = o.getJSONArray("voices");
             if (va.length() < 1 || va.length() > 64) throw new JSONException("voices");
@@ -95,10 +98,10 @@ public final class VoiceCatalog {
             List<ModelManifest.Asset> assets = new ArrayList<>();
             for (PackFile f : files) assets.add(new ModelManifest.Asset(f.path, f.bytes, f.sha256, "voice", f.license, licenseUrl));
             List<ModelManifest.Speaker> speakers = new ArrayList<>();
-            for (Voice v : voices) speakers.add(new ModelManifest.Speaker(v.id, "vi", "unknown", "unknown", "", false));
-            return new ModelManifest.Builder(id, version).task("tts").languages(Collections.singletonList("vi"))
+            for (Voice v : voices) speakers.add(new ModelManifest.Speaker(v.id, language, "unknown", "unknown", "", false));
+            return new ModelManifest.Builder(id, version).task("tts").languages(Collections.singletonList(language))
                     .provider("sherpa-onnx-vits", 1, 1).compatibility(23, Integer.MAX_VALUE, Arrays.asList("armeabi-v7a", "arm64-v8a", "x86"))
-                    .upstream("https://github.com/k2-fsa/sherpa-onnx/releases/tag/tts-models", "voices-v1")
+                    .upstream("https://github.com/k2-fsa/sherpa-onnx/releases/tag/tts-models", release)
                     .sampleRateHz(sampleRate).requiredAssets(Arrays.asList(model, tokens)).assets(assets)
                     .speakers(speakers).build();
         }
@@ -125,7 +128,10 @@ public final class VoiceCatalog {
     }
 
     public Pack find(String id) { for (Pack p : packs) if (p.id.equals(id)) return p; return null; }
+    /** The legacy (minor 1) pack: the first one, Vietnamese. */
     public Pack defaultPack() { return packs.isEmpty() ? null : packs.get(0); }
+    /** The first pack speaking {@code language} ("vi" / "en"), or null. */
+    public Pack forLanguage(String language) { for (Pack p : packs) if (p.language.equals(language)) return p; return null; }
 
     static String https(String url, boolean allowlisted) throws JSONException {
         try {

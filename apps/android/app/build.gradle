@@ -40,8 +40,8 @@ android {
         applicationId 'com.anisub.runtime'
         minSdk 23
         targetSdk 34
-        versionCode 2
-        versionName '0.2.0'
+        versionCode 3
+        versionName '0.3.0'
         ndk { abiFilters(*packagedAbis) }
     }
     sourceSets { main { jniLibs.srcDirs = [rootProject.file('native/jniLibs')] } }
@@ -51,7 +51,10 @@ android {
         // Release signing only via the owner's local keystore.properties; otherwise unsigned.
         debug { signingConfig signingConfigs.debug }
         release {
-            minifyEnabled false
+            // R8 shrinking (no obfuscation, see proguard-rules.pro): keeps ML Kit's dex/resources small.
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             if (keystoreProps['storeFile']) signingConfig signingConfigs.release
         }
     }
@@ -76,6 +79,16 @@ tasks.register('verifyNativeLibs') {
 tasks.named('preBuild') { dependsOn 'verifyNativeLibs' }
 
 dependencies {
+    // ANISUB-004: on-device subtitle translation (owner's choice 07-10-2026: ML Kit Translate, closed source accepted
+    // as for AniBox OCR) + bundled language identification for "und" cues. Measured on the unsigned release build
+    // (armeabi-v7a + arm64-v8a), 07-10-2026: 17.16 MB -> 31.81 MB (+14.65 MB) with R8 shrinking turned on in the same
+    // change (without R8: 34.21 MB). lib/arm64-v8a/libtranslate_jni.so +6.78 MB in the APK (16.36 MB extracted on
+    // install), lib/armeabi-v7a +5.99 MB (11.61 MB), language-id native libs +0.79 MB (1.63 MB) + model 0.32 MB,
+    // dex +0.34 MB, resources +0.25 MB. Translation models (~30 MB each) are downloaded only after consent in
+    // SettingsActivity, by ML Kit through the system DownloadManager (no Google Play services needed). Telemetry
+    // backend and start-up providers removed in the manifest. See docs/android-addon-contract.md (minor 2).
+    implementation 'com.google.mlkit:translate:17.0.3'
+    implementation 'com.google.mlkit:language-id:17.0.6'
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.json:json:20240303'
 }

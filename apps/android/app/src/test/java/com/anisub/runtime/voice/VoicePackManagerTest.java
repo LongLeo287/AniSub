@@ -122,7 +122,7 @@ public class VoicePackManagerTest {
                 {"\"model.onnx\"", "\"../model.onnx\""},
                 {"\"tokens.txt\"", "\"/etc/tokens.txt\""},
                 {"\"espeak-ng-data/phontab\"", "\"espeak-ng-data/lib.so\""},
-                {"\"language\":\"vi\"", "\"language\":\"en\""},
+                {"\"language\":\"vi\"", "\"language\":\"fr\""}, // only vi / en voices (minor 2)
         };
         for (String[] m : mutations) {
             String bad = good.replace(m[0], m[1]);

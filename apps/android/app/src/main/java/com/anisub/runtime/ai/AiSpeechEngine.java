@@ -3,6 +3,7 @@ package com.anisub.runtime.ai;
 import android.os.Handler;
 import android.os.Looper;
 import com.anisub.runtime.models.LoadLease;
+import com.anisub.runtime.voice.EspeakData;
 import com.anisub.runtime.voice.VoiceCatalog;
 import com.anisub.runtime.voice.VoicePackManager;
 import java.io.File;
@@ -19,6 +20,8 @@ import java.util.concurrent.Executors;
 public final class AiSpeechEngine {
     public static final long IDLE_UNLOAD_MS = 60_000, LOAD_DEADLINE_MS = 60_000, STALL_MS = 10_000;
     public enum State { IDLE, LOADING, READY, FAILED }
+    /** Voice pack manager for a voice language ("vi" / "en"), or null when none exists. */
+    public interface PackResolver { VoicePackManager forLanguage(String language); }
     public interface Listener {
         void started(String id);
         void finished(String id);
@@ -26,7 +29,8 @@ public final class AiSpeechEngine {
         void engineChanged(State state, String error);
     }
 
-    private final VoicePackManager voices;
+    private final PackResolver packs;
+    private final File espeakRoot;
     private final RatePolicy rates;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService loader = Executors.newSingleThreadExecutor(r -> { Thread t = new Thread(r, "anisub-engine-load"); t.setDaemon(true); return t; });
@@ -39,12 +43,36 @@ public final class AiSpeechEngine {
     private SherpaSynthesizer synth;
     private NarrationPipeline pipeline;
     private String loadedPackVersion;
+    private VoicePackManager loadedPacks;
+    /** Voice language of the next load; a different loaded language is unloaded first. */
+    private String language = "vi", loadedLanguage;
     private volatile String voiceId;
     private final Runnable idleUnload = this::unload;
 
-    public AiSpeechEngine(VoicePackManager voices, RatePolicy rates, int threads) {
-        this.voices = voices; this.rates = rates; this.threads = threads;
+    /**
+     * @param packs voice pack per language
+     * @param espeakRoot shared espeak-ng data directory (see {@link com.anisub.runtime.voice.EspeakData})
+     */
+    public AiSpeechEngine(PackResolver packs, RatePolicy rates, int threads, File espeakRoot) {
+        this.packs = packs; this.rates = rates; this.threads = threads; this.espeakRoot = espeakRoot;
     }
+
+    /**
+     * Chooses the voice language ("vi" / "en"). When another language is resident it is unloaded;
+     * the next {@link #load()} loads this language's pack (one engine in memory at a time).
+     */
+    public void setLanguage(String lang) {
+        boolean unload;
+        synchronized (this) {
+            if (lang == null || lang.equals(language)) return;
+            language = lang;
+            unload = state != State.IDLE;
+        }
+        if (unload) unload();
+    }
+    public synchronized String language() { return language; }
+    /** Language of the resident (READY) pack, or null. */
+    public synchronized String loadedLanguage() { return state == State.READY ? loadedLanguage : null; }
 
     public void addListener(Listener l) { listeners.addIfAbsent(l); }
     public void removeListener(Listener l) { listeners.remove(l); }
@@ -59,6 +87,8 @@ public final class AiSpeechEngine {
         if (state == State.LOADING || state == State.READY) return;
         state = State.LOADING; error = null;
         final long generation = ++loadGeneration;
+        final String lang = language;
+        final VoicePackManager voices = packs.forLanguage(lang);
         notifyChanged();
         final Runnable timeout = () -> {
             synchronized (AiSpeechEngine.this) {
@@ -71,13 +101,15 @@ public final class AiSpeechEngine {
         loader.execute(() -> {
             LoadLease l = null; SherpaSynthesizer s = null; NarrationPipeline p = null; String failure = null;
             try {
+                if (voices == null) throw new java.io.IOException("VOICE_PACK_MISSING");
                 l = voices.acquire();
                 VoiceCatalog.Pack pack = voices.catalog().find(l.version().manifest().id);
                 if (pack == null) throw new IllegalStateException("MODEL_INCOMPATIBLE");
                 File dir = l.version().directory();
+                File espeak = EspeakData.prepare(espeakRoot, dir, pack);
                 VoiceCatalog.Voice v = pack.voice(voiceId);
-                s = new SherpaSynthesizer(new File(dir, pack.model), new File(dir, pack.tokens), new File(dir, pack.dataDir), threads, (v == null ? pack.voices.get(0) : v).speakerId);
-                s.synthesize("Xin chào.", 1f, () -> false); // warm-up so the first cue is not cold
+                s = new SherpaSynthesizer(new File(dir, pack.model), new File(dir, pack.tokens), espeak, threads, (v == null ? pack.voices.get(0) : v).speakerId);
+                s.synthesize(warmUpText(pack.language), 1f, () -> false); // warm-up so the first cue is not cold
                 p = new NarrationPipeline(s, new AudioTrackSink(), new Relay(), rates, STALL_MS);
             } catch (Throwable t) {
                 String m = t.getMessage() == null ? "" : t.getMessage();
@@ -90,6 +122,7 @@ public final class AiSpeechEngine {
                 accepted = loadGeneration == generation && state == State.LOADING;
                 if (accepted && failure == null) {
                     lease = l; synth = s; pipeline = p; state = State.READY; loadedPackVersion = l.version().manifest().version;
+                    loadedLanguage = lang; loadedPacks = voices;
                 } else if (accepted) { state = State.FAILED; error = failure; }
             }
             if (!accepted || failure != null) {
@@ -105,8 +138,8 @@ public final class AiSpeechEngine {
     /** Chooses the pack voice for new utterances (null = first voice). */
     public void setVoice(String id) {
         voiceId = id;
-        SherpaSynthesizer s; LoadLease l; synchronized (this) { s = synth; l = lease; }
-        if (s == null || l == null) return;
+        SherpaSynthesizer s; LoadLease l; VoicePackManager voices; synchronized (this) { s = synth; l = lease; voices = loadedPacks; }
+        if (s == null || l == null || voices == null) return;
         VoiceCatalog.Pack pack = voices.catalog().find(l.version().manifest().id);
         VoiceCatalog.Voice v = pack == null ? null : pack.voice(id);
         if (v != null) s.setSpeaker(v.speakerId);
@@ -141,6 +174,7 @@ public final class AiSpeechEngine {
         synchronized (this) {
             loadGeneration++;
             p = pipeline; s = synth; l = lease; pipeline = null; synth = null; lease = null; loadedPackVersion = null;
+            loadedLanguage = null; loadedPacks = null;
             state = State.IDLE; error = null;
         }
         main.removeCallbacks(idleUnload);
@@ -155,6 +189,9 @@ public final class AiSpeechEngine {
 
     /** Unloads, then runs {@code after} on the loader thread once the lease is closed. */
     public void unloadThen(Runnable after) { unload(); loader.execute(after); }
+
+    /** A short phrase in the pack's language (warm-up and post-install smoke test). */
+    public static String warmUpText(String language) { return "en".equals(language) ? "Hello." : "Xin chào."; }
 
     private void notifyChanged() {
         final State s; final String e; synchronized (this) { s = state; e = error; }

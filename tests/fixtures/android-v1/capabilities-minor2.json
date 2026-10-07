@@ -1,0 +1,92 @@
+{
+  "directText": true,
+  "modes": [
+    "system",
+    "ai"
+  ],
+  "minor": 2,
+  "multiSpeaker": false,
+  "protocolMajor": 1,
+  "voices": {
+    "vi": {
+      "voices": [{
+        "name": "VAIS-1000",
+        "id": "vais1000"
+      }],
+      "state": "ready",
+      "id": "vi-vais1000-medium",
+      "version": "1",
+      "sizeBytes": 64017617
+    },
+    "en": {
+      "voices": [],
+      "state": "missing",
+      "id": "en-ljspeech-medium",
+      "version": "1",
+      "sizeBytes": 64400101
+    }
+  },
+  "runtime": {
+    "versionName": "0.3.0",
+    "versionCode": 3
+  },
+  "voicePack": {
+    "license": "Mô hình: MIT (rhasspy/piper-voices) · Dữ liệu VAIS-1000: CC BY 4.0 · espeak-ng-data: GPL-3.0-or-later",
+    "name": "VAIS-1000 (Piper, tiếng Việt)",
+    "voices": [{
+      "name": "VAIS-1000",
+      "id": "vais1000"
+    }],
+    "state": "READY",
+    "id": "vi-vais1000-medium",
+    "updateAvailable": false,
+    "version": "1",
+    "sizeBytes": 64017617
+  },
+  "type": "CAPABILITIES",
+  "translate": {
+    "models": {
+      "de": "missing",
+      "hi": "missing",
+      "ru": "missing",
+      "ko": "missing",
+      "pt": "missing",
+      "ms": "missing",
+      "en": "ready",
+      "it": "missing",
+      "fr": "missing",
+      "zh": "missing",
+      "es": "missing",
+      "ar": "missing",
+      "vi": "ready",
+      "th": "missing",
+      "ja": "missing",
+      "id": "missing"
+    },
+    "engine": "mlkit",
+    "lookaheadMs": 90000,
+    "available": true,
+    "detect": true
+  },
+  "offline": true,
+  "tts": true,
+  "aiVoice": true,
+  "major": 1,
+  "engine": "android-system-tts",
+  "rate": {
+    "default": 1,
+    "min": 0.8,
+    "max": 1.3
+  },
+  "aiEngine": {
+    "name": "sherpa-onnx",
+    "state": "IDLE",
+    "version": "1.13.8"
+  },
+  "translation": true,
+  "timeline": {
+    "maxCues": 4096,
+    "maxTextUnits": 1048576
+  },
+  "state": "local-vietnamese-ready"
+}

@@ -124,6 +124,131 @@
           ]
         }
       ]
+    },
+    {
+      "id": "en-ljspeech-medium",
+      "version": "1",
+      "name": "LJSpeech (Piper, tiếng Anh)",
+      "language": "en",
+      "engine": "sherpa-onnx-vits",
+      "sampleRate": 22050,
+      "release": "voices-en-v1",
+      "license": "Mô hình: MIT (rhasspy/piper-voices) · Dữ liệu LJ Speech: phạm vi công cộng · espeak-ng-data: GPL-3.0-or-later",
+      "licenseUrl": "https://github.com/LongLeo287/AniSub/blob/main/docs/voices.md",
+      "attribution": "Giọng en_US-ljspeech-medium của dự án Piper (rhasspy/piper-voices), do Bryce Beattie huấn luyện từ đầu trên LJ Speech Dataset (keithito.com, phạm vi công cộng); bản ONNX do k2-fsa/sherpa-onnx đóng gói. Dữ liệu phát âm espeak-ng (GPL-3.0-or-later).",
+      "model": "en_US-ljspeech-medium.onnx",
+      "tokens": "tokens.txt",
+      "dataDir": "espeak-ng-data",
+      "voices": [
+        {
+          "id": "ljspeech",
+          "name": "LJSpeech",
+          "speakerId": 0,
+          "gender": "female",
+          "accent": "en-US"
+        }
+      ],
+      "files": [
+        {
+          "path": "en_US-ljspeech-medium.onnx",
+          "bytes": 63531507,
+          "sha256": "8ceba58a4b540d4e7e7e24ad079cf0d92762a4fd334e059f12940787c6c37b3d",
+          "license": "MIT (piper-voices); training data LJ Speech, public domain",
+          "urls": [
+            "https://github.com/LongLeo287/AniSub/releases/download/voices-en-v1/ljspeech-en_US-ljspeech-medium.onnx"
+          ]
+        },
+        {
+          "path": "tokens.txt",
+          "bytes": 940,
+          "sha256": "ef3a7e4a8d1af0c9d4dc45aaae1a6242ebe24a7ed6f3d025a49eb29682784c6d",
+          "license": "Apache-2.0 (sherpa-onnx conversion)",
+          "urls": [
+            "https://github.com/LongLeo287/AniSub/releases/download/voices-en-v1/ljspeech-tokens.txt"
+          ]
+        },
+        {
+          "path": "MODEL_CARD",
+          "bytes": 517,
+          "sha256": "fbee1529c89d36b3fe76d7e9f3f832dce17f44900a52d76a9bda735654766b4d",
+          "license": "MIT (piper-voices)",
+          "urls": [
+            "https://github.com/LongLeo287/AniSub/releases/download/voices-en-v1/ljspeech-MODEL_CARD"
+          ]
+        },
+        {
+          "path": "espeak-ng-data/phontab",
+          "bytes": 55796,
+          "sha256": "886f3fa402cb0ba73d483aa8ad000af47a6b7cc06293c75a97913fba68a530f6",
+          "license": "GPL-3.0-or-later (espeak-ng)",
+          "urls": [
+            "https://github.com/LongLeo287/AniSub/releases/download/voices-en-v1/ljspeech-espeak-ng-data.phontab"
+          ]
+        },
+        {
+          "path": "espeak-ng-data/phonindex",
+          "bytes": 39074,
+          "sha256": "3ca7b8fa3b42624e4b0f152707e7a39245fce569aa99ea47c055d9e622fcf0c4",
+          "license": "GPL-3.0-or-later (espeak-ng)",
+          "urls": [
+            "https://github.com/LongLeo287/AniSub/releases/download/voices-en-v1/ljspeech-espeak-ng-data.phonindex"
+          ]
+        },
+        {
+          "path": "espeak-ng-data/phondata",
+          "bytes": 550424,
+          "sha256": "4e0288957874029a8c3c9f41a8f517ad4bf18127046decbdd4b9d1d6807ce3a3",
+          "license": "GPL-3.0-or-later (espeak-ng)",
+          "urls": [
+            "https://github.com/LongLeo287/AniSub/releases/download/voices-en-v1/ljspeech-espeak-ng-data.phondata"
+          ]
+        },
+        {
+          "path": "espeak-ng-data/intonations",
+          "bytes": 2040,
+          "sha256": "3f8af65fd3eda9759a10f021d61361c120871f463515229c925995c7f90918cc",
+          "license": "GPL-3.0-or-later (espeak-ng)",
+          "urls": [
+            "https://github.com/LongLeo287/AniSub/releases/download/voices-en-v1/ljspeech-espeak-ng-data.intonations"
+          ]
+        },
+        {
+          "path": "espeak-ng-data/vi_dict",
+          "bytes": 52608,
+          "sha256": "bbf7cab4ba733b2f5d9d3b61eb1194ef745232fa3adebb4bc92456e948cb3722",
+          "license": "GPL-3.0-or-later (espeak-ng)",
+          "urls": [
+            "https://github.com/LongLeo287/AniSub/releases/download/voices-en-v1/ljspeech-espeak-ng-data.vi_dict"
+          ]
+        },
+        {
+          "path": "espeak-ng-data/en_dict",
+          "bytes": 166944,
+          "sha256": "71bd330ba8a2e3e8076e631508208ef49449d6147c17b7bd2b4b1e1468292e35",
+          "license": "GPL-3.0-or-later (espeak-ng)",
+          "urls": [
+            "https://github.com/LongLeo287/AniSub/releases/download/voices-en-v1/ljspeech-espeak-ng-data.en_dict"
+          ]
+        },
+        {
+          "path": "espeak-ng-data/lang/aav/vi",
+          "bytes": 111,
+          "sha256": "3199c980f9e23a88a2aa693cd631bf4fcb0f3408c4272bc01b7ac0ff8e79d778",
+          "license": "GPL-3.0-or-later (espeak-ng)",
+          "urls": [
+            "https://github.com/LongLeo287/AniSub/releases/download/voices-en-v1/ljspeech-espeak-ng-data.lang.aav.vi"
+          ]
+        },
+        {
+          "path": "espeak-ng-data/lang/gmw/en",
+          "bytes": 140,
+          "sha256": "4605d5330801de3641c6e366d15f129ea1f5ffbce8722642aba01ace07ab9c83",
+          "license": "GPL-3.0-or-later (espeak-ng)",
+          "urls": [
+            "https://github.com/LongLeo287/AniSub/releases/download/voices-en-v1/ljspeech-espeak-ng-data.lang.gmw.en"
+          ]
+        }
+      ]
     }
   ]
 }
