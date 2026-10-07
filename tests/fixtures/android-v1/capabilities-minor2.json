@@ -83,7 +83,7 @@
     "state": "IDLE",
     "version": "1.13.8"
   },
-  "translation": true,
+  "translation": false,
   "timeline": {
     "maxCues": 4096,
     "maxTextUnits": 1048576

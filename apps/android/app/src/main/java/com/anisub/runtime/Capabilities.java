@@ -65,7 +65,9 @@ public final class Capabilities {
         JSONObject out = new JSONObject();
         out.put("type", "CAPABILITIES").put("major", MAJOR).put("minor", MINOR).put("protocolMajor", MAJOR)
                 .put("directText", true).put("tts", systemReady).put("offline", systemReady || anyVoice)
-                .put("aiVoice", aiVoice).put("translation", translate.available).put("multiSpeaker", false)
+                // Legacy "translation"/"multiSpeaker" stay false: AniBox (minor-1 parser) rejects a reply whose
+                // engine is "android-system-tts" and claims either. Availability is translate.available.
+                .put("aiVoice", aiVoice).put("translation", false).put("multiSpeaker", false)
                 .put("engine", "android-system-tts").put("state", systemState == null ? "initializing" : systemState);
         out.put("voicePack", legacyPack(pack, aiVoice));
         JSONObject voices = new JSONObject();

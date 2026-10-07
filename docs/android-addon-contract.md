@@ -36,7 +36,7 @@ See [System Design](superpowers/specs/2026-10-07-anisub-runtime-design.md).
 | `tts` | bool | a local offline Vietnamese **system** voice is installed (mode "system") |
 | `offline` | bool | `tts` or `aiVoice` |
 | `aiVoice` | bool | true ONLY when the verified **Vietnamese** pack is installed and READY (minor-1 meaning) |
-| `translation` | bool | minor 2: `translate.available` (was always false) |
+| `translation` | false | always false, as in minor 1: AniBox's parser rejects a reply with `engine:"android-system-tts"` that claims `translation` or `multiSpeaker`. Translation availability is `translate.available` (section 3b) |
 | `multiSpeaker` | false | not offered |
 | `engine`, `state` | "android-system-tts", string | legacy system-voice fields, kept |
 | `voicePack.state` | NONE / DOWNLOADING / VERIFYING / READY / ERROR | pack lifecycle |

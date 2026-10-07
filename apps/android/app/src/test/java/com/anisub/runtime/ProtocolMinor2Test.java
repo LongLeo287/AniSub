@@ -124,7 +124,7 @@ public class ProtocolMinor2Test {
         assertTrue(caps.getBoolean("aiVoice"));
         assertEquals("READY", caps.getJSONObject("voicePack").getString("state"));
         assertEquals("[\"ai\"]", caps.getJSONArray("modes").toString());
-        assertTrue(caps.getBoolean("translation"));
+        assertFalse("legacy field stays false (AniBox parser)", caps.getBoolean("translation"));
         // Minor 2.
         JSONObject vi = caps.getJSONObject("voices").getJSONObject("vi"), en = caps.getJSONObject("voices").getJSONObject("en");
         assertEquals("ready", vi.getString("state")); assertEquals("vi-vais1000-medium", vi.getString("id"));

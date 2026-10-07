@@ -66,6 +66,8 @@
         "engine", "state", "voicePack", "voices", "translate", "timeline", "aiEngine", "modes", "rate", "runtime"],
       "properties": {
         "type": { "const": "CAPABILITIES" }, "major": { "const": 1 }, "minor": { "const": 2 }, "protocolMajor": { "const": 1 },
+        "translation": { "const": false, "$comment": "legacy; AniBox minor-1 parser rejects true with engine android-system-tts" },
+        "multiSpeaker": { "const": false }, "engine": { "type": "string", "maxLength": 80 },
         "voices": {
           "type": "object", "required": ["vi", "en"],
           "properties": { "vi": { "$ref": "#/$defs/voiceEntry" }, "en": { "$ref": "#/$defs/voiceEntry" } }
