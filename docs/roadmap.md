@@ -1,5 +1,31 @@
 # AniSub roadmap
 
+2026-10-08 ANISUB-005 ([task](tasks/ANISUB-005.md)): **in progress**, isolated
+`codex/anisub-005` branch from `f0b77f5`. Catalog/voice manager and additive Messenger 1.2
+selection are being implemented with strict older-AniBox compatibility and one-model residency
+gates. Intake evidence: 119 Android JUnit tests, 4,296 legacy admission checks, 34 Node tests,
+debug build/lint pass. These are baseline results, not validation of the new implementation.
+No AniBox changes, release, signing, commit or push in this task.
+
+ANISUB-005 corrective checkpoint (2026-10-08): 134 Android JUnit tests pass (15 added vs intake),
+debug build passes, lint 0 errors / 1 warning, legacy admission 4,296 and Node 34 tests pass.
+Old-version cleanup protects LKG; catalog error recovery and voice admission tests added.
+This was an intermediate checkpoint, not whole-task acceptance.
+
+ANISUB-005 next checkpoint: 142 JUnit tests pass; bounded optional voice metadata/schema and
+TV voice manager + AI reading controls implemented. API-34 offline D-pad/BACK smoke covers
+inventory, actions, reading menus and safe download confirmation. ARM debug APK 37,091,130
+bytes (+36,001 vs intake); six native entries unchanged. Catalog/storage/residency full matrix,
+Cake publication availability, independent review and physical voice quality remain pending.
+No AniBox client behavior is claimed for stored priority/duck preferences. Final wording rebuild
+also passes; latest ARM debug APK is 37,181,719 bytes (+126,590 vs intake). See task evidence.
+
+2026-10-08 VOICE-002 ([research](research/VOICE-002-2026-10-08.md)): primary-source
+documentation complete; no additional clean-provenance male/southern/central voice below
+approximately 80 MB admitted. Cake sid0/sid2 are the already owner-approved candidates;
+synthetic voice-source rights/consent remain undisclosed. Consented recording and Piper
+fine-tuning plan documented. No model download, training or P650 benchmark performed.
+
 2026-10-07 ANISUB-004 ([task](tasks/ANISUB-004.md)): protocol **major 1 / minor 2** — softsub
 translated on the TV (ML Kit Translate, consented models) into the voice language (vi/en), English
 Piper voice pack `en-ljspeech-medium` (release `voices-en-v1` staged, not published), cues sent ahead

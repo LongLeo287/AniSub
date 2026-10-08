@@ -31,6 +31,12 @@ public final class OpenRules {
         boolean systemReady();
         boolean packReady(String voiceLang);
         Set<String> packVoices(String voiceLang);
+        /** Known catalog voice, including packs not yet installed. */
+        default boolean knownAiVoice(String id, String lang) { return packVoices(lang).contains(id); }
+        default boolean voiceEnabled(String id) { return true; }
+        default boolean aiVoiceReady(String id, String lang) { return packReady(lang); }
+        default String defaultAiVoice(String lang) { return null; }
+        default boolean systemVoiceReady(String id, String lang) { return false; }
         /** The translation engine can run on this device. */
         boolean translateAvailable();
         /** Why it cannot (null when available). */
@@ -94,6 +100,10 @@ public final class OpenRules {
             if (!(raw instanceof String)) throw new JSONException("mode type");
             mode = (String) raw;
         }
+        // Legacy system OPEN ignores rate/voice exactly as before the voice manager.
+        String explicitVoice = optionalVoice(open, "voiceId");
+        String alias = optionalVoice(open, "voice");
+        if (explicitVoice != null && alias != null && !explicitVoice.equals(alias)) throw new JSONException("conflicting voice aliases");
         float rate = defaultRate;
         if (open.has("rate")) {
             Object raw = open.get("rate");
@@ -102,12 +112,7 @@ public final class OpenRules {
             if (!RatePolicy.validUserRate(r)) throw new JSONException("rate bounds");
             rate = (float) r;
         }
-        String voice = null;
-        if (open.has("voice") && !open.isNull("voice")) {
-            Object raw = open.get("voice");
-            if (!(raw instanceof String) || ((String) raw).isEmpty() || ((String) raw).length() > 80) throw new JSONException("voice type");
-            voice = (String) raw;
-        }
+        String voice = explicitVoice != null ? explicitVoice : alias;
         String voiceLang = LanguageTags.VI;
         if (open.has("voiceLang") && !open.isNull("voiceLang")) {
             Object raw = open.get("voiceLang");
@@ -117,14 +122,20 @@ public final class OpenRules {
         if (!LanguageTags.valid(language)) throw new JSONException("language");
         if (MODE_SYSTEM.equals(mode)) {
             boolean systemTest = Boolean.TRUE.equals(open.opt("systemTest"));
+            if (explicitVoice != null) {
+                if (!systemTest || !LanguageTags.voice(voiceLang) || !LanguageTags.base(language).equals(voiceLang)
+                        || !env.voiceEnabled(explicitVoice) || !env.systemVoiceReady(explicitVoice, voiceLang)) return Decision.reject("UNSUPPORTED");
+                return new Decision(null, MODE_SYSTEM, rate, explicitVoice, voiceLang, voiceLang, false, null);
+            }
             if (!LanguageTags.VI.equals(voiceLang)) return Decision.reject("UNSUPPORTED");
             if (!systemTest || !"vi".equals(language) || !env.systemReady()) return Decision.reject("UNAVAILABLE");
             return new Decision(null, MODE_SYSTEM, rate, null, LanguageTags.VI, LanguageTags.VI, false, null);
         }
         if (!MODE_AI.equals(mode)) return Decision.reject("UNSUPPORTED");
         if (!LanguageTags.voice(voiceLang)) return Decision.reject("UNSUPPORTED", detail("voiceLang", voiceLang));
-        if (!env.packReady(voiceLang)) return Decision.reject(VOICE_PACK_MISSING, detail("voiceLang", voiceLang));
-        if (voice != null && !env.packVoices(voiceLang).contains(voice)) return Decision.reject("UNSUPPORTED");
+        if (voice == null) voice = env.defaultAiVoice(voiceLang);
+        if (voice != null && (!env.knownAiVoice(voice, voiceLang) || !env.voiceEnabled(voice))) return Decision.reject("UNSUPPORTED");
+        if (voice == null ? !env.packReady(voiceLang) : !env.aiVoiceReady(voice, voiceLang)) return Decision.reject(VOICE_PACK_MISSING, detail("voiceLang", voiceLang));
 
         String source = LanguageTags.base(language);
         if (LanguageTags.UND.equals(source) && !env.detectAvailable()) source = LanguageTags.EN; // documented assumption
@@ -178,4 +189,10 @@ public final class OpenRules {
     }
 
     private static JSONObject detail(String key, String value) throws JSONException { return new JSONObject().put(key, value); }
+    private static String optionalVoice(JSONObject open, String key) throws JSONException {
+        if (!open.has(key) || open.isNull(key)) return null;
+        Object raw = open.get(key);
+        if (!(raw instanceof String) || ((String) raw).length() < 1 || ((String) raw).length() > 80) throw new JSONException("voice type");
+        return (String) raw;
+    }
 }

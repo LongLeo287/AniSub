@@ -2,6 +2,9 @@ package com.anisub.runtime;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ActivityNotFoundException;
+import android.content.Intent;
+import android.speech.tts.TextToSpeech;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
@@ -24,10 +27,16 @@ import com.anisub.runtime.translate.LanguageTags;
 import com.anisub.runtime.translate.MlKitTranslation;
 import com.anisub.runtime.voice.VoiceCatalog;
 import com.anisub.runtime.voice.VoicePackManager;
+import com.anisub.runtime.voice.VoiceRegistry;
+import com.anisub.runtime.settings.AniSubPrefs;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.LinkedHashSet;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * TV settings: D-pad rows, BACK closes, Vietnamese text, dark theme. Sections: the Vietnamese and
@@ -48,22 +57,29 @@ public final class SettingsActivity extends Activity {
     private RuntimeHost host;
     private PackRows vi, en;
     private Row voice, rate, trStatus, trAuto, trModels, trTest, anibox, about;
+    private Row managerRow, catalogRow, readingRow;
+    private Row systemInstallRow, storageRow, runtimeRow;
+    private AlertDialog activeDialog;
+    private int readingIndex, voiceActionIndex, priorityIndex;
+    private String selectedVoiceId;
+    private final ExecutorService storageWorker = Executors.newSingleThreadExecutor();
     private final Runnable refresh = this::render;
     private int previewCounter;
     private String previewId, previewPending, previewText;
+    private float previewRate = 1f;
     private String trialResult;
     private boolean trialRunning;
 
     private final AiSpeechEngine.Listener engineListener = new AiSpeechEngine.Listener() {
         public void started(String id) { if (id.equals(previewId)) render(); }
-        public void finished(String id) { if (id.equals(previewId)) { previewId = null; render(); } }
-        public void failed(String id, String code) { if (id.equals(previewId)) { previewId = null; render(); } }
+        public void finished(String id) { if (id.equals(previewId)) { previewId = null; host.endPreview(); render(); } }
+        public void failed(String id, String code) { if (id.equals(previewId)) { previewId = null; host.endPreview(); render(); } }
         public void engineChanged(AiSpeechEngine.State state, String error) {
             AiSpeechEngine engine = host.engine();
             if (previewPending != null && state == AiSpeechEngine.State.READY && engine != null && previewPending.equals(engine.loadedLanguage())) {
                 String lang = previewPending; previewPending = null; speak(lang, previewText);
             }
-            if (state == AiSpeechEngine.State.FAILED) previewPending = null;
+            if (state == AiSpeechEngine.State.FAILED && previewPending != null) { previewPending = null; host.endPreview(); }
             render();
         }
     };
@@ -139,13 +155,27 @@ public final class SettingsActivity extends Activity {
         voice = add(list, "Giọng đọc");
         header(list, text("Giọng tiếng Anh", 22, ACCENT, true));
         en = new PackRows(list, LanguageTags.EN, "giọng tiếng Anh");
+        managerRow = add(list, "Danh mục giọng đọc");
+        systemInstallRow = add(list, "Tải giọng hệ thống");
+        systemInstallRow.view.setOnClickListener(v -> installSystemVoices());
+        catalogRow = add(list, "Cập nhật danh mục");
+        managerRow.view.setOnClickListener(v -> showVoiceManager());
+        catalogRow.view.setOnClickListener(v -> confirm("Kiểm tra danh mục?",
+                "Tải danh mục từ GitHub của AniSub. Bản lỗi không thay thế danh mục đang dùng; không tự tải giọng mới.",
+                "Kiểm tra", () -> { if (!host.refreshCatalog()) info("Chưa kiểm tra được", "Chờ phiên đọc hoặc thao tác tải hiện tại kết thúc."); }));
         header(list, text("Đọc và dịch", 22, ACCENT, true));
         rate = add(list, "Tốc độ đọc");
+        readingRow = add(list, "Cách đọc giọng AI");
+        readingRow.view.setOnClickListener(v -> showReadingSettings());
         trStatus = add(list, "Dịch phụ đề trên TV");
         trAuto = add(list, "Tự tải gói dịch khi cần");
         trModels = add(list, "Mô hình dịch");
         trTest = add(list, "Dịch thử");
         anibox = add(list, "Dùng trong AniBox");
+        runtimeRow = add(list, "Tình trạng runtime");
+        runtimeRow.info = true;
+        storageRow = add(list, "Bộ nhớ");
+        storageRow.view.setOnClickListener(v -> showStorage());
         about = add(list, "Giấy phép và giới thiệu");
         trStatus.info = true; anibox.info = true;
         voice.view.setOnClickListener(v -> nextVoice());
@@ -173,7 +203,64 @@ public final class SettingsActivity extends Activity {
         render();
     }
 
+    @Override protected void onResume() {
+        super.onResume();
+        host.systemVoices().refresh();
+        render();
+    }
+
+    @Override public boolean dispatchKeyEvent(KeyEvent event) {
+        if (oneShotRepeat(event)) return true;
+        return super.dispatchKeyEvent(normalizeKey(event));
+    }
+
+    static int normalizedKeyCode(int key) {
+        if (key == KeyEvent.KEYCODE_BUTTON_A) return KeyEvent.KEYCODE_DPAD_CENTER;
+        if (key == KeyEvent.KEYCODE_BUTTON_B) return KeyEvent.KEYCODE_BACK;
+        return key;
+    }
+
+    private static KeyEvent normalizeKey(KeyEvent event) {
+        int code = normalizedKeyCode(event.getKeyCode());
+        return code == event.getKeyCode() ? event : new KeyEvent(event.getDownTime(), event.getEventTime(),
+                event.getAction(), code, event.getRepeatCount(), event.getMetaState(), event.getDeviceId(),
+                event.getScanCode(), event.getFlags(), event.getSource());
+    }
+
+    static boolean oneShotRepeat(KeyEvent event) {
+        int code = normalizedKeyCode(event.getKeyCode());
+        return event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() > 0
+                && (code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_DPAD_CENTER
+                || code == KeyEvent.KEYCODE_ENTER || code == KeyEvent.KEYCODE_NUMPAD_ENTER);
+    }
+
+    /** Dialogs have their own Window, so gamepad normalization must also happen here. */
+    private void showDialog(AlertDialog dialog, boolean safe, int selection) {
+        View opener = activeDialog != null && activeDialog.isShowing() ? activeDialog.getCurrentFocus() : getCurrentFocus();
+        activeDialog = dialog;
+        dialog.setOnKeyListener((d, key, event) -> {
+            if (oneShotRepeat(event)) return true;
+            KeyEvent normalized = normalizeKey(event);
+            if (normalized != event) { dialog.dispatchKeyEvent(normalized); return true; }
+            return false;
+        });
+        dialog.setOnDismissListener(d -> {
+            if (activeDialog != dialog) return;
+            activeDialog = null;
+            if (opener != null && opener.isShown() && opener.isFocusable()) opener.requestFocus();
+            else keepFocus();
+        });
+        dialog.show();
+        if (safe && dialog.getButton(AlertDialog.BUTTON_NEGATIVE) != null)
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus();
+        else if (dialog.getListView() != null && selection >= 0) {
+            dialog.getListView().setSelection(selection);
+            dialog.getListView().requestFocus();
+        }
+    }
+
     @Override protected void onStop() {
+        if (host.previewActive()) host.cancelPreview();
         host.removeListener(refresh);
         host.removeEngineListener(engineListener);
         if (host.engine() != null) {
@@ -182,6 +269,12 @@ public final class SettingsActivity extends Activity {
         if (host.translation() != null && !host.sessionActive()) host.translation().releaseClients();
         previewPending = null; previewId = null;
         super.onStop();
+    }
+
+    @Override protected void onDestroy() {
+        storageWorker.shutdown();
+        if (activeDialog != null) activeDialog.dismiss();
+        super.onDestroy();
     }
 
     private Row add(LinearLayout list, String label) { Row r = new Row(label); list.addView(r.view); return r; }
@@ -206,7 +299,7 @@ public final class SettingsActivity extends Activity {
         boolean busy = host.anyPackBusy() || (host.translation() != null && host.translation().busy());
         if (busy) getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         else getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        rate.set("Tốc độ đọc", String.format(Locale.ROOT, "%.1f×  ·  ◀ ▶ để chỉnh (0.8–1.3), dùng cho cả hai giọng", host.defaultRate()), true, true);
+        rate.set("Tốc độ đọc", String.format(Locale.ROOT, "%.1f× mặc định · ◀ ▶ để chỉnh (0.8–1.3); từng giọng có tùy chỉnh riêng", host.defaultRate()), true, true);
         renderTranslation();
         renderCommon();
     }
@@ -241,7 +334,7 @@ public final class SettingsActivity extends Activity {
                 break;
             case ERROR: statusText = "Lỗi: " + packError(s.error, pack); break;
             default: statusText = LanguageTags.VI.equals(rows.lang)
-                    ? "Chưa cài. AniBox vẫn dùng được giọng hệ thống (nếu có)."
+                    ? "Chưa cài giọng AI. Có thể chọn riêng giọng hệ thống nếu thiết bị đã cài."
                     : "Chưa cài. Cần khi chọn giọng đọc tiếng Anh trong AniBox.";
         }
         if (host.sessionActive()) statusText += "\nĐang dùng trong AniBox.";
@@ -310,11 +403,24 @@ public final class SettingsActivity extends Activity {
     }
 
     private void renderCommon() {
+        managerRow.set("Danh mục giọng đọc", "Giọng AI và giọng hệ thống cục bộ · lựa chọn và tùy chỉnh riêng từng giọng", true, true);
+        systemInstallRow.set("Tải giọng hệ thống", "Mở trình cài dữ liệu TTS của thiết bị; AniSub chỉ liệt kê giọng cục bộ đã cài.", true, true);
+        catalogRow.set("Cập nhật danh mục", host.catalogState(), !host.sessionActive() && !host.anyPackBusy() && !host.previewActive(), true);
+        readingRow.set("Cách đọc", "Biểu cảm mặc định, ngắt câu, khoảng nghỉ, âm lượng phim khi đọc " + host.settings().duckLevel()
+                + "% và thứ tự phụ đề " + priorityLabel(host.settings().languagePriority()) + ".", true, true);
         String ab;
         if (host.aniBoxCompatible()) ab = "AniBox đã cài và cùng chữ ký. Mở AniBox › Cài đặt › Thuyết minh, chọn “Giọng AI (AniSub)”.";
         else if (host.aniBoxInstalled()) ab = "AniBox đã cài nhưng khác chữ ký nên không thể kết nối. Cài bản AniBox và AniSub chính thức.";
         else ab = "Chưa cài AniBox. AniSub là phần bổ trợ, cần AniBox để thuyết minh khi xem phim.";
         anibox.set("Dùng trong AniBox", ab, false, true);
+        AiSpeechEngine engine = host.engine();
+        String runtime = host.sessionActive() ? "Phiên đọc AniBox đang hoạt động" : "Không có phiên đọc AniBox";
+        runtime += " · Engine AI: " + host.engineState();
+        if (engine != null && engine.loadedLanguage() != null) runtime += " · model " + LanguageTags.displayName(engine.loadedLanguage());
+        if(engine!=null&&engine.loadedVoiceId()!=null){VoiceRegistry.Entry resident=host.registry().find(engine.loadedVoiceId());if(resident!=null)runtime+=" · "+resident.name;}
+        runtime += "\nGiọng hệ thống cục bộ đã cài: " + host.systemVoices().all().size();
+        runtimeRow.set("Tình trạng runtime", runtime, false, true);
+        storageRow.set("Bộ nhớ", "Dung lượng thực tế của gói giọng, mô hình dịch và bộ nhớ đệm · xóa an toàn", true, true);
         about.set("Giấy phép và giới thiệu", "AniSub " + host.versionName() + " (" + host.versionCode() + ") · "
                 + SherpaSynthesizer.ENGINE + " " + SherpaSynthesizer.ENGINE_VERSION + " · ML Kit Translate · GPL-3.0-or-later", true, true);
         keepFocus();
@@ -322,9 +428,10 @@ public final class SettingsActivity extends Activity {
 
     /** A row that stops being actionable (or hides) while focused must not strand D-pad focus. */
     private void keepFocus() {
+        if (activeDialog != null && activeDialog.isShowing()) return;
         View focused = getCurrentFocus();
         if (focused != null && focused.isFocusable() && focused.getVisibility() == View.VISIBLE) return;
-        for (Row r : new Row[]{vi.action, vi.preview, en.action, en.preview, rate, trAuto, trModels, voice, vi.delete, en.delete, about}) {
+        for (Row r : new Row[]{vi.action, vi.preview, en.action, en.preview, managerRow, systemInstallRow, catalogRow, rate, readingRow, trAuto, trModels, voice, vi.delete, en.delete, storageRow, about}) {
             if (r.view.isFocusable() && r.view.getVisibility() == View.VISIBLE) { r.view.requestFocus(); return; }
         }
     }
@@ -379,7 +486,7 @@ public final class SettingsActivity extends Activity {
     private void onPreview(String lang) {
         AiSpeechEngine engine = host.engine();
         if (engine == null || host.sessionActive()) return;
-        if (previewId != null) { engine.stop(); previewId = null; render(); return; }
+        if (previewId != null) { host.cancelPreview(); previewId = null; render(); return; }
         speakWhenReady(lang, LanguageTags.EN.equals(lang) ? PREVIEW_EN : PREVIEW_VI);
     }
 
@@ -387,9 +494,7 @@ public final class SettingsActivity extends Activity {
     private void speakWhenReady(String lang, String text) {
         AiSpeechEngine engine = host.engine();
         if (engine == null || host.sessionActive()) return;
-        engine.setLanguage(lang);
-        if (engine.ready() && lang.equals(engine.loadedLanguage())) speak(lang, text);
-        else { previewPending = lang; previewText = text; engine.load(); render(); }
+        previewVoice(host.defaultVoice(lang), text);
     }
 
     private void speak(String lang, String text) {
@@ -397,7 +502,7 @@ public final class SettingsActivity extends Activity {
         if (engine == null || host.sessionActive() || !lang.equals(engine.loadedLanguage())) return;
         engine.stop();
         previewId = "preview-" + (++previewCounter);
-        if (!engine.speak(previewId, text, host.defaultRate())) previewId = null;
+        if (!engine.speak(previewId, text, previewRate)) { previewId = null; host.endPreview(); }
         render();
     }
 
@@ -408,7 +513,7 @@ public final class SettingsActivity extends Activity {
             if (host.sessionActive()) { info("Không xóa được", packError(VoicePackManager.E_IN_USE, null)); return; }
             AiSpeechEngine engine = host.engine();
             Runnable remove = () -> {
-                String error = voices.delete();
+                String error = host.deletePack(voices.pack().id);
                 if (error != null) runOnUiThread(() -> info("Không xóa được", packError(error, null)));
             };
             if (engine != null) engine.unloadThen(remove); else remove.run();
@@ -427,10 +532,11 @@ public final class SettingsActivity extends Activity {
                     : Capabilities.DOWNLOADING.equals(e.getValue()) ? "đang tải…" : "chưa cài · OK để tải";
             langs.add(l); labels.add(LanguageTags.displayName(l) + "  ·  " + state);
         }
-        new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+        AlertDialog dialog = new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle("Mô hình dịch (ML Kit)")
                 .setItems(labels.toArray(new String[0]), (d, which) -> onModel(tr, langs.get(which)))
-                .setNegativeButton("Đóng", null).show();
+                .setNegativeButton("Đóng", null).create();
+        showDialog(dialog, false, 0);
     }
 
     private void onModel(MlKitTranslation tr, String lang) {
@@ -485,7 +591,193 @@ public final class SettingsActivity extends Activity {
                 .setTitle(title).setMessage(message)
                 .setPositiveButton(positive, (dialog, which) -> { onYes.run(); render(); })
                 .setNegativeButton("Hủy", null).create();
-        d.show();
+        showDialog(d, true, -1);
+    }
+
+    private void showReadingSettings() {
+        AlertDialog dialog = new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle("Cách đọc")
+                .setItems(new String[]{"Biểu cảm mặc định", "Độ ngắt câu", "Khoảng nghỉ thêm giữa các dòng",
+                        "Âm lượng phim khi đọc: " + host.settings().duckLevel() + "%",
+                        "Ưu tiên phụ đề: " + priorityLabel(host.settings().languagePriority())}, (d, index) -> {
+                    readingIndex = index;
+                    if (index == 0) readingChoice("Biểu cảm mặc định · lần chuẩn bị kế tiếp", new String[]{"Điềm tĩnh", "Bình thường", "Sôi nổi"}, 0);
+                    if (index == 1) readingChoice("Độ ngắt câu", new String[]{"Ngắn", "Bình thường", "Dài"}, 1);
+                    if (index == 2) readingChoice("Khoảng nghỉ thêm", new String[]{"0 ms", "100 ms", "200 ms", "300 ms", "400 ms", "500 ms", "600 ms", "700 ms", "800 ms", "900 ms", "1000 ms"}, 2);
+                    if (index == 3) readingChoice("Âm lượng phim · cần client hỗ trợ tùy chọn mới", new String[]{"10%", "20%", "30%", "40%", "50%", "60%"}, 3);
+                    if (index == 4) showPriority();
+                }).setNegativeButton("Đóng", null).create();
+        showDialog(dialog, false, readingIndex);
+    }
+
+    private void readingChoice(String title, String[] labels, int kind) {
+        com.anisub.runtime.settings.AniSubPrefs prefs = host.settings();
+        int checked = kind == 0 ? com.anisub.runtime.settings.AniSubPrefs.STYLES.indexOf(prefs.style())
+                : kind == 1 ? com.anisub.runtime.settings.AniSubPrefs.GAPS.indexOf(prefs.gap())
+                : kind == 2 ? prefs.pauseMs() / 100 : Math.round(prefs.duckLevel() / 10f) - 1;
+        AlertDialog dialog = new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle(title).setSingleChoiceItems(labels, checked, (d, index) -> {
+                    if (kind == 0) prefs.setStyle(com.anisub.runtime.settings.AniSubPrefs.STYLES.get(index));
+                    if (kind == 1) prefs.setGap(com.anisub.runtime.settings.AniSubPrefs.GAPS.get(index));
+                    if (kind == 2) prefs.setPauseMs(index * 100);
+                    if (kind == 3) prefs.setDuckLevel((index + 1) * 10);
+                    host.notifySettingsChanged();
+                    d.dismiss(); showReadingSettings();
+                }).setNegativeButton("Quay lại", (d, which) -> showReadingSettings()).create();
+        dialog.setOnCancelListener(d -> showReadingSettings());
+        showDialog(dialog, false, checked);
+    }
+
+    private static String priorityLabel(List<String> languages) {
+        List<String> names = new ArrayList<>();
+        for (String language : languages) names.add(LanguageTags.displayName(language));
+        return android.text.TextUtils.join(" → ", names);
+    }
+
+    private void showPriority() {
+        List<String> languages = host.settings().languagePriority();
+        String[] labels = new String[languages.size()];
+        for (int i = 0; i < labels.length; i++) labels[i] = (i + 1) + ". " + LanguageTags.displayName(languages.get(i));
+        AlertDialog dialog = new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle("Ưu tiên phụ đề · cần client hỗ trợ tùy chọn mới")
+                .setItems(labels, (d, index) -> { priorityIndex = index; showPriorityActions(languages.get(index)); })
+                .setNegativeButton("Quay lại", (d, which) -> showReadingSettings()).create();
+        dialog.setOnCancelListener(d -> showReadingSettings());
+        showDialog(dialog, false, Math.min(priorityIndex, labels.length - 1));
+    }
+
+    private void showPriorityActions(String language) {
+        List<String> languages = host.settings().languagePriority();
+        int index = languages.indexOf(language);
+        List<String> labels = new ArrayList<>(); List<Integer> moves = new ArrayList<>();
+        if (index > 0) { labels.add("Đưa lên trước"); moves.add(-1); }
+        if (index >= 0 && index < languages.size() - 1) { labels.add("Đưa xuống sau"); moves.add(1); }
+        AlertDialog dialog = new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle(LanguageTags.displayName(language))
+                .setItems(labels.toArray(new String[0]), (d, which) -> {
+                    host.settings().movePriority(language, moves.get(which));
+                    host.notifySettingsChanged();
+                    priorityIndex = host.settings().languagePriority().indexOf(language); render(); showPriority();
+                }).setNegativeButton("Quay lại", (d, which) -> showPriority()).create();
+        dialog.setOnCancelListener(d -> showPriority());
+        showDialog(dialog, false, 0);
+    }
+
+    private void showVoiceManager() {
+        List<VoiceRegistry.Entry> entries = host.registry().all();
+        if (entries.isEmpty()) { info("Danh mục giọng", "Chưa có giọng khả dụng."); return; }
+        String[] labels = new String[entries.size()];
+        for (int i=0;i<entries.size();i++) {
+            VoiceRegistry.Entry e=entries.get(i);
+            VoiceRegistry.Entry def = host.registry().defaultVoice(e.kind, e.language);
+            VoicePackManager manager = e.packId == null ? null : host.pack(e.packId);
+            VoiceCatalog.Pack pack = manager == null ? null : manager.pack();
+            labels[i]=e.name+" · "+LanguageTags.displayName(e.language)+" · "+(e.kind==VoiceRegistry.Kind.AI?"AI":"Hệ thống")
+                    +" · "+genderLabel(e.gender)+(e.kind==VoiceRegistry.Kind.SYSTEM?" (ước lượng cao độ)":"")+" · "+accentLabel(e.accent)
+                    + (pack == null ? "" : " · " + VoicePackManager.formatBytes(pack.totalBytes) + " · " + pack.license)
+                    +" · "+(!e.installed?"Chưa cài":e.enabled?"Đã cài":"Đã tắt")
+                    + (def != null && def.id.equals(e.id) ? " · Mặc định" : "");
+        }
+        AlertDialog dialog=new AlertDialog.Builder(this,android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle("Giọng AI / Giọng Google (hệ thống)").setItems(labels,(d,index)->{
+                    selectedVoiceId = entries.get(index).id; voiceActionIndex = 0; showVoiceActions(selectedVoiceId);
+                })
+                .setNegativeButton("Đóng",null).create();
+        int selected = 0;
+        for (int i = 0; i < entries.size(); i++) if (entries.get(i).id.equals(selectedVoiceId)) selected = i;
+        showDialog(dialog, false, selected);
+    }
+
+    private void showVoiceActions(String id) {
+        VoiceRegistry.Entry e=host.registry().find(id);if(e==null)return;
+        selectedVoiceId = id;
+        String[] actions={"Thông tin / giấy phép", "Nghe thử", "Đặt mặc định ("+e.language+")",
+                e.enabled?"Tắt giọng":"Bật giọng", "Tốc độ", "Cao độ", "Âm lượng", "Tải gói", "Xóa gói", "Biểu cảm giọng AI", "Ước lượng cao độ giọng hệ thống"};
+        AlertDialog actionsDialog = new AlertDialog.Builder(this,android.R.style.Theme_DeviceDefault_Dialog_Alert).setTitle(e.name)
+                .setItems(actions,(dialog,index)->{
+                    voiceActionIndex = index;
+                    VoiceRegistry.Entry current=host.registry().find(id);if(current==null)return;
+                    switch(index){
+                        case 0:
+                            VoicePackManager m=host.pack(current.packId);VoiceCatalog.Pack p=m==null?null:m.pack();
+                            String detail=current.kind==VoiceRegistry.Kind.SYSTEM?"Giọng hệ thống đã cài, không dùng mạng. Nhãn giới tính chỉ là ước lượng cao độ: "+genderLabel(current.gender)+". Vùng giọng chưa xác minh.":
+                                    "Giới tính: "+genderLabel(current.gender)+" · Vùng: "+accentLabel(current.accent)+"\n"+(p==null?"":VoicePackManager.formatBytes(p.totalBytes)+"\n"+p.license+"\n"+p.attribution);
+                            info(current.name,detail);break;
+                        case 1: previewVoice(id,"en".equals(current.language)?PREVIEW_EN:PREVIEW_VI);break;
+                        case 2: if(current.usable())host.setDefaultVoice(id);else info("Chưa chọn được","Cài và bật giọng trước khi đặt mặc định.");break;
+                        case 3: String error=host.setVoiceEnabled(id,!current.enabled);if(error!=null)info("Không tắt được","Phải giữ ít nhất một giọng AI tiếng Việt khả dụng.");break;
+                        case 4: chooseSetting(id,"Tốc độ",new String[]{"0.8×","0.9×","1.0×","1.1×","1.2×","1.3×"},4);break;
+                        case 5: chooseSetting(id,"Cao độ",new String[]{"−3","−2","−1","0","+1","+2","+3"},5);break;
+                        case 6: chooseSetting(id,"Âm lượng",new String[]{"0%","25%","50%","75%","100%"},6);break;
+                        case 7:
+                            VoicePackManager manager=host.pack(current.packId);VoiceCatalog.Pack pack=manager==null?null:manager.pack();
+                            if(pack==null){info("Giọng hệ thống","Dữ liệu giọng do ứng dụng TTS của thiết bị quản lý.");break;}
+                            confirm("Tải "+pack.name+"?",VoicePackManager.formatBytes(pack.totalBytes)+" · GitHub AniSub\n"+pack.license+"\n"+pack.attribution,"Tải",()->{if(!host.downloadPack(pack.id))info("Chưa tải được","Chờ thao tác đang chạy kết thúc.");});break;
+                        case 8:
+                            if(current.packId==null){info("Giọng hệ thống","AniSub không xóa dữ liệu của ứng dụng TTS khác.");break;}
+                            confirm("Xóa gói giọng?","Các giọng dùng chung gói sẽ bị xóa. Giọng mặc định cuối cùng và model đang dùng được bảo vệ.","Xóa",()->{
+                                if(host.previewActive())host.cancelPreview();
+                                Runnable remove=()->{String result=host.deletePack(current.packId);if(result!=null)runOnUiThread(()->info("Không xóa được","Gói đang dùng hoặc là giọng AI tiếng Việt cuối cùng."));};
+                                if(host.engine()!=null)host.engine().unloadThen(remove);else remove.run();
+                            });break;
+                        case 9:
+                            if (current.kind == VoiceRegistry.Kind.SYSTEM) { info("Giọng hệ thống", "Engine hệ thống không hỗ trợ bộ tham số biểu cảm AI này."); break; }
+                            chooseSetting(id, "Biểu cảm · áp dụng lần chuẩn bị kế tiếp", new String[]{"Theo mặc định chung", "Điềm tĩnh", "Bình thường", "Sôi nổi"}, 9); break;
+                        case 10:
+                            if(current.kind!=VoiceRegistry.Kind.SYSTEM){info("Giọng AI","Thông tin giọng AI lấy từ catalog đã duyệt.");break;}
+                            confirm("Đo cao độ cục bộ?","Tạo một mẫu WAV ngắn trên thiết bị rồi xóa. Nhãn nam/nữ chỉ là ước lượng theo cao độ, không xác minh danh tính hoặc giới tính người nói. Không dùng mạng.","Đo",()->{
+                                if(!host.beginPreview(()->{})){info("Chưa đo được","Chờ phiên đọc hoặc thao tác đang chạy kết thúc.");return;}
+                                boolean started=host.systemVoices().estimatePitch(current,"en".equals(current.language)?PREVIEW_EN:PREVIEW_VI,result->runOnUiThread(()->{
+                                    host.endPreview();host.notifySettingsChanged();
+                                    if(!isFinishing()&&!isDestroyed()&&!"cancelled".equals(result.reason)){info("Ước lượng cao độ",genderLabel(result.gender)+" (ước lượng) · "+Math.round(result.pitchHz)+" Hz\nVùng giọng chưa xác minh.");render();}
+                                }));
+                                if(!started){host.endPreview();info("Chưa đo được","Engine không hỗ trợ tạo mẫu cục bộ hoặc đang bận.");}
+                            });break;
+                    }
+                    render();
+                }).setNegativeButton("Quay lại",(d,which)->showVoiceManager()).create();
+        actionsDialog.setOnCancelListener(d->showVoiceManager());
+        showDialog(actionsDialog, false, voiceActionIndex);
+    }
+
+    private void chooseSetting(String id,String title,String[] labels,int setting) {
+        AniSubPrefs prefs = host.settings();
+        int selected = setting == 4 ? Math.round((prefs.voiceRate(id) - .8f) * 10)
+                : setting == 5 ? prefs.voicePitch(id) + 3 : setting == 6 ? Math.round(prefs.voiceVolume(id) / 25f)
+                : AniSubPrefs.STYLES.indexOf(prefs.voiceStyle(id)) + 1;
+        if (setting == 9 && !prefs.hasVoiceStyle(id)) selected = 0;
+        AlertDialog settingDialog = new AlertDialog.Builder(this,android.R.style.Theme_DeviceDefault_Dialog_Alert).setTitle(title)
+                .setSingleChoiceItems(labels,selected,(d,index)->{
+                    if(setting==4)host.settings().setVoiceRate(id,.8f+index*.1f);
+                    if(setting==5)host.settings().setVoicePitch(id,index-3);
+                    if(setting==6)host.settings().setVoiceVolume(id,index*25);
+                    if(setting==9)host.settings().setVoiceStyle(id,index == 0 ? null : AniSubPrefs.STYLES.get(index - 1));
+                    host.notifySettingsChanged();
+                    d.dismiss();
+                    showVoiceActions(id);
+                }).setNegativeButton("Hủy",(d,which)->showVoiceActions(id)).create();
+        settingDialog.setOnCancelListener(d->showVoiceActions(id));
+        showDialog(settingDialog, false, selected);
+    }
+
+    private void previewVoice(String id,String phrase) {
+        VoiceRegistry.Entry e=host.registry().find(id);
+        if(e==null||!e.usable()){info("Chưa nghe thử được","Cài và bật giọng trước.");return;}
+        if(!host.beginPreview(()->{++previewCounter;if(host.engine()!=null)host.engine().stop();previewId=null;previewPending=null;})){
+            info("Đang dùng model","Dừng phiên đọc hoặc chờ thao tác tải hoàn tất.");return;
+        }
+        if(e.kind==VoiceRegistry.Kind.SYSTEM){
+            final int generation=++previewCounter;
+            if(!host.systemVoices().preview(e,host.settings().snapshot(id),phrase,()->runOnUiThread(()->{if(generation==previewCounter){host.endPreview();render();}}))){
+                host.endPreview(); info("Chưa nghe thử được", "Giọng hệ thống không sẵn sàng. Kiểm tra dữ liệu TTS của thiết bị rồi thử lại.");
+            }
+            return;
+        }
+        AiSpeechEngine engine=host.engine();if(engine==null){host.endPreview();return;}
+        previewPending=e.language;previewText=phrase;
+        com.anisub.runtime.settings.AniSubPrefs.Snapshot snapshot=host.settings().snapshot(id);
+        previewRate=snapshot.rate;
+        engine.configure(e.language,id,snapshot);render();
     }
 
     private void info(String title, String message) {
@@ -494,8 +786,118 @@ public final class SettingsActivity extends Activity {
         body.setPadding(dp(24), dp(12), dp(24), dp(12));
         body.setFocusable(true);
         scroll.addView(body);
-        new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                .setTitle(title).setView(scroll).setPositiveButton("Đóng", null).show();
+        AlertDialog dialog = new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle(title).setView(scroll).setPositiveButton("Đóng", null).create();
+        showDialog(dialog, false, -1);
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).requestFocus();
+    }
+
+    private void installSystemVoices() {
+        Intent intent = new Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA);
+        String engine = host.systemVoices().enginePackage();
+        if (engine != null && !engine.isEmpty()) intent.setPackage(engine);
+        if (intent.resolveActivity(getPackageManager()) == null) {
+            info("Không có trình cài giọng", "Ứng dụng TTS của thiết bị không cung cấp màn hình cài dữ liệu. Cài giọng cục bộ trong cài đặt hệ thống."); return;
+        }
+        try { startActivity(intent); }
+        catch (ActivityNotFoundException | SecurityException ignored) {
+            info("Không mở được trình cài giọng", "Thiết bị không cho mở trình cài dữ liệu TTS. Cài giọng trong cài đặt hệ thống.");
+        }
+    }
+
+    private static String genderLabel(String gender) {
+        if ("male".equals(gender)) return "Nam";
+        if ("female".equals(gender)) return "Nữ";
+        return "Chưa xác minh giới tính";
+    }
+
+    private static String accentLabel(String accent) {
+        if ("north".equals(accent)) return "Bắc";
+        if ("central".equals(accent)) return "Trung";
+        if ("south".equals(accent)) return "Nam";
+        if ("us".equals(accent) || "en-US".equals(accent)) return "Mỹ";
+        return "Chưa xác minh vùng giọng";
+    }
+
+    private void showStorage() {
+        LinearLayout content = new LinearLayout(this); content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(24), dp(8), dp(24), dp(8));
+        TextView details = text("Đang đo dung lượng tệp…", 15, Color.WHITE, false);
+        details.setFocusable(true); details.setPadding(0, dp(8), 0, dp(16)); content.addView(details);
+        Row cache = add(content, "Xóa bộ nhớ đệm");
+        cache.set("Xóa bộ nhớ đệm", "Chỉ xóa tệp tạm khi runtime rảnh; giữ model và dữ liệu dịch.", true, true);
+        cache.view.setOnClickListener(v -> confirm("Xóa bộ nhớ đệm?", "Tệp tạm của AniSub sẽ bị xóa. Các model, giọng mặc định và bản model tốt gần nhất được giữ.", "Xóa", this::clearCache));
+        Row remove = add(content, "Xóa các gói ngoài giọng mặc định");
+        remove.set("Xóa các gói ngoài giọng mặc định", "Giữ gói chứa giọng AI mặc định của từng ngôn ngữ; giọng dùng chung gói cũng được giữ.", true, true);
+        remove.view.setOnClickListener(v -> confirm("Xóa các gói ngoài giọng mặc định?", "Chỉ gói giọng AI không chứa giọng mặc định được xét xóa. Model đang dùng và giọng tiếng Việt cuối cùng luôn được bảo vệ; dữ liệu TTS hệ thống và dịch không bị xóa.", "Xóa", this::deleteNonDefaultPacks));
+        ScrollView scroll = new ScrollView(this); scroll.addView(content);
+        AlertDialog dialog = new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle("Bộ nhớ").setView(scroll).setNegativeButton("Đóng", null).create();
+        showDialog(dialog, false, -1); details.requestFocus();
+        storageWorker.execute(() -> {
+            RuntimeHost.StorageSnapshot snapshot;
+            try { snapshot = host.storageSnapshot(); }
+            catch (java.io.IOException | RuntimeException ignored) {
+                runOnUiThread(() -> { if (!isFinishing() && !isDestroyed() && dialog.isShowing()) details.setText("Không đo được dung lượng tệp. Hãy thử mở lại khi runtime rảnh."); });
+                return;
+            }
+            StringBuilder report = new StringBuilder("Gói giọng (kể cả bản tốt gần nhất): ")
+                    .append(VoicePackManager.formatBytes(snapshot.voiceBytes));
+            for (Map.Entry<String, Long> item : snapshot.packBytes.entrySet()) {
+                VoicePackManager manager = host.pack(item.getKey());
+                VoiceCatalog.Pack pack = manager == null ? null : manager.pack();
+                report.append("\n• ").append(pack == null ? item.getKey() : pack.name).append(": ")
+                        .append(VoicePackManager.formatBytes(item.getValue()));
+            }
+            report.append("\nDữ liệu riêng khác (gồm dữ liệu dịch): ").append(VoicePackManager.formatBytes(snapshot.otherPrivateBytes));
+            report.append("\nBộ nhớ đệm: ").append(VoicePackManager.formatBytes(snapshot.cacheBytes));
+            report.append("\nTrống trên thiết bị: ").append(VoicePackManager.formatBytes(snapshot.freeBytes));
+            report.append("\nGiọng hệ thống do ứng dụng TTS quản lý. ML Kit không cung cấp dung lượng tệp riêng từng ngôn ngữ qua API công khai.");
+            runOnUiThread(() -> { if (!isFinishing() && !isDestroyed() && dialog.isShowing()) details.setText(report.toString()); });
+        });
+    }
+
+    private void clearCache() {
+        if (host.sessionActive() || host.anyPackBusy()) { info("Chưa xóa được", "Dừng phiên đọc và chờ thao tác tải hoàn tất."); return; }
+        if (host.previewActive()) host.cancelPreview();
+        Runnable clear = () -> submitStorage(() -> {
+            String error = host.clearSafeCache();
+            runOnUiThread(() -> { if (!isFinishing() && !isDestroyed()) info(error == null ? "Đã xóa bộ nhớ đệm" : "Chưa xóa được",
+                    error == null ? "Các model và giọng đọc được giữ." : "Runtime còn đang dùng tệp hoặc không truy cập được bộ nhớ. Hãy thử lại khi rảnh."); });
+        });
+        if (host.engine() != null) host.engine().unloadThen(clear); else clear.run();
+    }
+
+    static Set<String> defaultPackIds(VoiceRegistry registry) {
+        Set<String> kept = new LinkedHashSet<>();
+        for (VoiceRegistry.Entry entry : registry.all()) if (entry.kind == VoiceRegistry.Kind.AI) {
+            VoiceRegistry.Entry def = registry.defaultVoice(VoiceRegistry.Kind.AI, entry.language);
+            if (def != null && def.packId != null) kept.add(def.packId);
+        }
+        return kept;
+    }
+
+    private void deleteNonDefaultPacks() {
+        if (host.sessionActive() || host.anyPackBusy()) { info("Chưa xóa được", "Dừng phiên đọc và chờ thao tác tải hoàn tất."); return; }
+        if (host.previewActive()) host.cancelPreview();
+        Runnable remove = () -> submitStorage(() -> {
+            int removed = 0, retained = 0;
+            // The host rechecks the live default/lease rules for every deletion.
+            for (VoiceCatalog.Pack pack : host.catalog().packs) {
+                if (defaultPackIds(host.registry()).contains(pack.id)) { retained++; continue; }
+                VoicePackManager manager = host.pack(pack.id);
+                if (manager == null || manager.installed() == null) continue;
+                if (host.deletePackUnlessDefault(pack.id) == null) removed++; else retained++;
+            }
+            final String result = "Đã xóa " + removed + " gói; giữ " + retained + " gói mặc định hoặc đang được bảo vệ. Mô hình dịch và TTS hệ thống được giữ.";
+            runOnUiThread(() -> { if (!isFinishing() && !isDestroyed()) { render(); info("Dọn gói giọng", result); } });
+        });
+        if (host.engine() != null) host.engine().unloadThen(remove); else remove.run();
+    }
+
+    private void submitStorage(Runnable work) {
+        try { storageWorker.execute(work); }
+        catch (java.util.concurrent.RejectedExecutionException ignored) { /* Activity already left. */ }
     }
 
     private static String join(List<String> items) {

@@ -86,6 +86,16 @@ public class ContractTest {
         assertTrue(manifest.contains("LEANBACK_LAUNCHER"));
     }
 
+    @Test public void downloadPermissionAndTelemetryBoundaryAreExplicit() throws Exception {
+        String manifest = new String(Files.readAllBytes(Paths.get("src/main/AndroidManifest.xml")), StandardCharsets.UTF_8);
+        assertTrue(manifest.contains("<uses-permission android:name=\"android.permission.INTERNET\" />"));
+        assertFalse(manifest.contains("android.permission.INTERNET\" tools:node=\"remove\""));
+        assertTrue(manifest.contains("android:usesCleartextTraffic=\"false\""));
+        int backend = manifest.indexOf("android:name=\"com.google.android.datatransport.runtime.backends.TransportBackendDiscovery\"");
+        assertTrue(backend >= 0);
+        assertTrue(manifest.substring(backend, manifest.indexOf("/>", backend)).contains("tools:node=\"remove\""));
+    }
+
     // ------------------------------------------------------------------ OPEN modes
     static final Set<String> VOICES = new HashSet<>(Collections.singletonList("vais1000"));
     static OpenRules.Decision open(String json, boolean systemReady, boolean packReady) throws JSONException {

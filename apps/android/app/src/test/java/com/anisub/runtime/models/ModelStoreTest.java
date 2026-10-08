@@ -40,6 +40,24 @@ public class ModelStoreTest {
     }
     private interface IOCall { void run() throws Exception; }
 
+    @Test public void relativeRegisteredAndLeasedPathsCannotBeReclaimed() throws Exception {
+        File root = temp.newFolder("relative-store"); ModelStore store = store(root, p -> {});
+        ModelVersion version = install(store, "voice", "v1");
+        // A relative caller handle is invalid regardless of working directory/drive.
+        File relative = new File("versions/" + version.directory().getName());
+        assertFalse(relative.isAbsolute());
+        denied(RuntimeError.MODEL_CORRUPT, () -> store.reclaimOrphan(relative));
+        try (LoadLease lease = store.acquire(version)) {
+            store.markReady(lease);
+            denied(RuntimeError.MODEL_CORRUPT, () -> store.reclaimOrphan(relative));
+            assertEquals(1, store.leaseCount(version));
+            assertTrue(new File(version.directory(), "weights.bin").isFile());
+            assertNotNull(store.registry().lastKnownGood("voice"));
+        }
+        denied(RuntimeError.MODEL_CORRUPT, () -> store.reclaimOrphan(relative));
+        assertTrue(version.directory().isDirectory());
+    }
+
     @Test public void recoveryAndLease() throws Exception {
         File root = temp.newFolder("store"); ModelStore store = store(root, p -> {});
         byte[] good = {1, 2, 3}; File stage = store.createStage(); put(stage, new byte[]{1, 2, 4});

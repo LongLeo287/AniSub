@@ -359,3 +359,22 @@ test Binder death, delayed callbacks, seek/pause, duplicate cues and volume rest
 No original-content modification, source credentials or model weights in addon.
 Coordinate signer identity without copying private keys. This document is a local handoff, not a
 message to Claude or confirmation Claude has implemented/accepted it.
+# ANISUB-005 additive WIP contract (2026-10-08)
+
+Messenger remains major 1 / minor 2. `OPEN.voiceId` is optional; absent/null preserves existing
+admission. AI accepts the legacy `voice` alias; both non-null aliases must be strings of 1–80
+UTF-16 units and agree, otherwise MALFORMED. Unknown, disabled, wrong-kind or wrong-language
+voices are UNSUPPORTED; a known AI voice without installed data is VOICE_PACK_MISSING, never
+an implicit system-TTS fallback. Legacy system requests without `voiceId` retain their Vietnamese
+system-test behavior. Explicit local system selection requires `systemTest:true`, `voiceId`, and
+matching source/voice language; it never translates.
+
+Optional CAPABILITIES voice metadata adds `gender`, `accent`, `enabled`, `default` to existing
+AI voice entries and a separate `systemVoices` array. The optional inventory may be incomplete
+to fit the existing 16,384-unit wire budget; AniSub's local manager is the complete inventory.
+Mandatory legacy fields and their semantics are unchanged: engine remains android-system-tts,
+translation/multiSpeaker remain false; AI availability still describes the Vietnamese AI pack.
+System default and AI defaults are independent. Unknown system gender/accent stay unknown.
+
+These source changes are not a claim that an old AniBox already displays/selects the new metadata.
+Client picker integration is a separate task; final independent review and device gates remain pending.

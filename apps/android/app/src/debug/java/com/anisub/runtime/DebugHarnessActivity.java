@@ -107,7 +107,7 @@ public final class DebugHarnessActivity extends Activity {
                 case "speak": speak(arg(intent, "lang", "vi"), intent.getStringExtra("text")); break;
                 case "session": timelineFlag = intent.getBooleanExtra("timeline", true); session(arg(intent, "from", "en"), arg(intent, "to", "vi"), intent.getIntExtra("cues", 20)); break;
                 case "cleanup": cleanup(); break;
-                case "dm-probe": dmProbe(arg(intent, "lang", "vi")); break;
+                case "dm-probe": dmProbe(arg(intent, "lang", "vi"), intent.getStringExtra("voiceId")); break;
                 case "sim-first-run": simFirstRun(); break;
                 case "restore-first-run": restoreFirstRun(); break;
                 default: log("unknown cmd");
@@ -300,11 +300,13 @@ public final class DebugHarnessActivity extends Activity {
 
     /**
      * Downloads every file of a catalog pack through the system DownloadManager (the release transport;
-     * AniSub has no INTERNET permission) into the cache, checks size + SHA-256, then deletes the copies.
+     * with caller INTERNET permission) into the cache, checks size + SHA-256, then deletes the copies.
      * The installed pack is not touched.
      */
-    private void dmProbe(final String lang) {
-        final com.anisub.runtime.voice.VoiceCatalog.Pack pack = host.catalog().forLanguage(lang);
+    private void dmProbe(final String lang, String voiceId) {
+        final com.anisub.runtime.voice.VoiceCatalog.Pack pack = voiceId == null
+                ? host.catalog().forLanguage(lang) : host.catalog().forVoice(voiceId);
+        if (pack == null) { log("dm-probe unknown catalog selection"); return; }
         final File dir = new File(getCacheDir(), "dm-probe");
         new Thread(() -> {
             com.anisub.runtime.voice.SystemDownloadFetcher f = new com.anisub.runtime.voice.SystemDownloadFetcher(this, "AniSub-harness");

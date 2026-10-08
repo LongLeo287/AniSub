@@ -26,6 +26,7 @@ subtitle file. Shipping wire contract: protocol **major 1 / minor 2**, see
   INTERNET permission again from 0.3.1 (the DownloadProvider refuses callers without it, which broke
   every download in 0.3.0); ML Kit may contact Google's Firebase Installations / Remote Config (ids,
   app/device info, never subtitle text); its usage telemetry stays removed.
+  INTERNET is app-wide, not a per-host firewall: it also lets dependency network clients open sockets.
 - Trust: callers are authorized at runtime (sending UID -> package `com.anibox.tv` -> same signing
   certificate). No install-time permission is required, so installing AniBox before AniSub works.
   Debug builds of AniSub (only) also accept `com.anibox.tv.debug` with the same signer check, so

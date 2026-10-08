@@ -153,6 +153,7 @@ public final class ModelStore {
         deleteTree(v.directory(), 0); fs.delete(ownerFile(v.directory())); return RemovalResult.REMOVED;
     }
     public synchronized ModelRegistry registry() { return new ModelRegistry(versions, good); }
+    public File rootDirectory() { return root; }
     /** Includes owner-only residue; an absent directory still names an exact-owned cleanup target. */
     public synchronized List<File> orphanStages() {
         List<File> orphans = new ArrayList<>();
@@ -172,7 +173,8 @@ public final class ModelStore {
     }
     /** Explicitly reclaim exact-owned unregistered stage/version/owner-only residue. Retry-safe. */
     public synchronized void reclaimOrphan(File orphan) throws IOException {
-        if (orphan == null) throw new StoreException(RuntimeError.MODEL_CORRUPT);
+        if (orphan == null || !orphan.isAbsolute()) throw new StoreException(RuntimeError.MODEL_CORRUPT);
+        orphan = orphan.getCanonicalFile();
         safe(orphan); File parent = orphan.getAbsoluteFile().getParentFile();
         if ((!parent.equals(staging) && !parent.equals(versionsDir)) || !owned(orphan, parent)) throw new StoreException(RuntimeError.MODEL_CORRUPT);
         // Registered versions include all last-known-good and leased models; never reclaim them.

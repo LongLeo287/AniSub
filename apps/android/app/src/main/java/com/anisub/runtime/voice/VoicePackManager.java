@@ -96,6 +96,7 @@ public final class VoicePackManager {
         this.store = store; this.catalog = catalog; this.fetcher = fetcher; this.smoke = smoke; this.listener = listener;
         this.packId = packId;
         refresh();
+        saveInstalledDescriptor();
         cleanupSuperseded();
         synchronized (lock) {
             state = installed() != null ? State.READY : corruptVersions().isEmpty() ? State.NONE : State.ERROR;
@@ -106,6 +107,24 @@ public final class VoicePackManager {
     public VoiceCatalog catalog() { return catalog; }
     /** The catalog pack this manager installs (null when the catalog lacks it). */
     public VoiceCatalog.Pack pack() { return packId == null ? null : catalog.find(packId); }
+    /** Never use newer catalog metadata to load the still-installed predecessor model. */
+    public VoiceCatalog.Pack installedPack() {
+        ModelVersion v=installed();VoiceCatalog.Pack p=pack();
+        if(v==null)return null;
+        if(p!=null&&p.version.equals(v.manifest().version))return p;
+        try { return new VoiceCatalog.Pack(new org.json.JSONObject(CatalogRepository.read(descriptorFile(v.manifest().version)))); }
+        catch(Exception ignored){return null;}
+    }
+    private File descriptorFile(String version){return new File(new File(store.rootDirectory(),"descriptors"),packId+"-"+version+".json");}
+    private void saveInstalledDescriptor(){VoiceCatalog.Pack p=pack();ModelVersion v=installed();if(p!=null&&v!=null&&p.version.equals(v.manifest().version))try{saveDescriptor(p);}catch(IOException ignored){}}
+    private void saveDescriptor(VoiceCatalog.Pack p)throws IOException{
+        File target=descriptorFile(p.version);if(target.isFile())return;
+        File dir=target.getParentFile();if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("descriptor storage");
+        File stage=new File(dir,target.getName()+".tmp");try(FileOutputStream out=new FileOutputStream(stage)){out.write(p.descriptorJson.getBytes(java.nio.charset.StandardCharsets.UTF_8));out.getFD().sync();}
+        if(!stage.renameTo(target)){stage.delete();throw new IOException("descriptor replace");}
+    }
+    public void markReady(LoadLease lease)throws IOException{store.markReady(lease);refresh();}
+    public void release(LoadLease lease){if(lease==null)return;lease.close();try{store.unload(lease.version());}catch(IOException ignored){}refresh();}
     /** True while a download/verification of this pack runs. */
     public boolean busy() { synchronized (lock) { return busy; } }
 
@@ -149,13 +168,15 @@ public final class VoicePackManager {
 
     private void refresh() { snapshot = store.registry().versions(); }
 
-    /** Startup: when the catalog version is installed, older versions of the same pack are surplus. */
+    /** Remove unused predecessors, but retain the last model proven READY for rollback. */
     private void cleanupSuperseded() {
         VoiceCatalog.Pack pack = pack();
         ModelVersion current = installed();
         if (pack == null || current == null || !current.manifest().version.equals(pack.version)) return;
+        ModelVersion lastGood = store.registry().lastKnownGood(pack.id);
         for (ModelVersion v : snapshot) {
-            if (v.manifest().id.equals(pack.id) && !v.identity().equals(current.identity())) {
+            if (v.manifest().id.equals(pack.id) && !v.identity().equals(current.identity())
+                    && (lastGood == null || !v.identity().equals(lastGood.identity()))) {
                 try { store.remove(v); } catch (IOException ignored) { /* retried next start */ }
             }
         }
@@ -184,9 +205,9 @@ public final class VoicePackManager {
     /** Removes the installed (or corrupt) pack unless a speech session holds its lease. Not on the main thread. */
     public String delete() {
         synchronized (lock) { if (busy) return E_IN_USE; }
-        List<ModelVersion> targets = new ArrayList<>(corruptVersions());
-        ModelVersion v = installed();
-        if (v != null) targets.add(v);
+        List<ModelVersion> targets = new ArrayList<>();
+        for(ModelVersion v:snapshot)if(v.manifest().id.equals(packId))targets.add(v);
+        for(ModelVersion v:targets)if(store.leaseCount(v)>0)return E_IN_USE;
         try {
             for (ModelVersion t : targets) {
                 RemovalResult r = store.remove(t);
@@ -231,6 +252,7 @@ public final class VoicePackManager {
             }
             synchronized (lock) { state = State.VERIFYING; }
             publish();
+            if (cancelRequested) { failure=E_CANCELLED;return; }
             // A version found corrupt earlier stays registered (state CORRUPT); remove it so the
             // fresh download of the same id/version can be installed.
             for (ModelVersion bad : corruptVersions()) {
@@ -239,6 +261,7 @@ public final class VoicePackManager {
             refresh();
             ModelVersion previous = installed();
             ModelVersion version;
+            saveDescriptor(pack);
             try { version = store.install(stage, pack.manifest()); stage = null; }
             catch (ModelStore.StoreException e) {
                 String code = e.error().name();
@@ -246,6 +269,7 @@ public final class VoicePackManager {
                 return;
             }
             refresh();
+            if(cancelRequested){try{store.remove(version);}catch(IOException ignored){}failure=E_CANCELLED;return;}
             if (smoke != null) {
                 String smokeError = smoke.run(version.directory(), pack);
                 if (smokeError != null) {
@@ -253,9 +277,10 @@ public final class VoicePackManager {
                     failure = E_INCOMPATIBLE; return;
                 }
             }
-            if (previous != null && !previous.identity().equals(version.identity()) && !keepPreviousUntilRestart) {
-                try { store.remove(previous); } catch (IOException ignored) { /* removed at next start */ }
-            }
+            if (cancelRequested) { try { store.remove(version); } catch(IOException ignored) { } failure=E_CANCELLED;return; }
+            // Native espeak may still own predecessor paths until process restart.
+            // Cleanup itself also protects the actual last-known-good model and leases.
+            if (!keepPreviousUntilRestart) cleanupSuperseded();
         } catch (IOException | RuntimeException e) {
             failure = E_STORAGE;
         } finally {
