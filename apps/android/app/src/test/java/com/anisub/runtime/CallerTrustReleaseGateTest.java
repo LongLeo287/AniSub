@@ -54,6 +54,12 @@ public class CallerTrustReleaseGateTest {
         }
     }
 
+    /** Owner 08-10-2026: a shared UID that contains AniBox plus another package is refused too, signer or not. */
+    @Test public void aSharedUidContainingAniBoxPlusAnotherPackageIsRejected() {
+        Map<Integer, String[]> shared = uids(10301, new String[]{ANIBOX, "com.other.app"});
+        assertFalse(trusts(10301, shared, signers(ANIBOX, "com.other.app")));
+    }
+
     @Test public void aSharedUidOfUnrelatedPackagesIsRejected() {
         Map<Integer, String[]> shared = uids(10300, new String[]{"com.evil.one", "com.evil.two"});
         assertFalse(trusts(10300, shared, signers("com.evil.one", "com.evil.two", ANIBOX)));

@@ -13,7 +13,7 @@ import java.util.List;
  *
  * Release builds accept exactly {@link #CLIENT_PACKAGE}. Debug builds of AniSub additionally
  * accept {@link #DEBUG_CLIENT_PACKAGE} (AniBox debug), still with the same-signer check, so
- * debug-signed pairs can be tested end to end.
+ * debug-signed pairs can be tested end to end. The sending UID must own exactly one package (no shared UIDs).
  */
 public final class CallerPolicy {
     public static final String CLIENT_PACKAGE = "com.anibox.tv";
@@ -39,7 +39,9 @@ public final class CallerPolicy {
         if (sendingUid < 0 || packages == null) return false;
         String[] owned;
         try { owned = packages.packagesForUid(sendingUid); } catch (RuntimeException e) { return false; }
-        if (owned == null) return false;
+        // The UID must belong to the client package ALONE: a shared UID that also holds other packages is
+        // refused (AniBox declares no sharedUserId, so a genuine AniBox UID always owns exactly one package).
+        if (owned == null || owned.length != 1) return false;
         List<String> uidPackages = Arrays.asList(owned);
         for (String client : clientPackages(debugBuild)) {
             if (!uidPackages.contains(client)) continue;
