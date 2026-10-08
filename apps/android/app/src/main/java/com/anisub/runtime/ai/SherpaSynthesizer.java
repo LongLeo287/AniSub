@@ -4,6 +4,7 @@ import com.k2fsa.sherpa.onnx.GeneratedAudio;
 import com.k2fsa.sherpa.onnx.OfflineTts;
 import com.k2fsa.sherpa.onnx.OfflineTtsConfig;
 import java.io.File;
+import com.anisub.runtime.settings.AniSubPrefs;
 
 /**
  * sherpa-onnx VITS/Piper adapter. Android-free so the same binding runs in host benchmarks.
@@ -17,6 +18,7 @@ public final class SherpaSynthesizer implements NarrationPipeline.Synthesizer {
     private final int sampleRate, speakers;
     private volatile int speakerId;
     private boolean released;
+    private final AniSubPrefs.Snapshot settings;
 
     /**
      * @param modelFile VITS .onnx inside the verified pack
@@ -25,6 +27,12 @@ public final class SherpaSynthesizer implements NarrationPipeline.Synthesizer {
      * @param threads inference threads (P650 has 4 cores; 2 leaves room for video decode)
      */
     public SherpaSynthesizer(File modelFile, File tokensFile, File espeakDataDir, int threads, int speakerId) {
+        this(modelFile,tokensFile,espeakDataDir,threads,speakerId,new AniSubPrefs.Snapshot(1,0,100,0,"normal","normal"));
+    }
+    public SherpaSynthesizer(File modelFile, File tokensFile, File espeakDataDir, int threads, int speakerId, AniSubPrefs.Snapshot settings) {
+        this.settings=settings;
+        try { VoiceTokens.verify(tokensFile); }
+        catch(java.io.IOException invalid){throw new IllegalArgumentException("MODEL_TOKEN_FORMAT",invalid);}
         OfflineTtsConfig config = new OfflineTtsConfig();
         config.model.vits.model = modelFile.getAbsolutePath();
         config.model.vits.tokens = tokensFile.getAbsolutePath();
@@ -33,14 +41,22 @@ public final class SherpaSynthesizer implements NarrationPipeline.Synthesizer {
         config.model.debug = false;
         config.model.provider = "cpu";
         config.maxNumSentences = 1;
+        config.model.vits.noiseScale=.667f;config.model.vits.noiseScaleW=.8f;
+        if("calm".equals(settings.style)){config.model.vits.noiseScale=.45f;config.model.vits.noiseScaleW=.6f;}
+        if("lively".equals(settings.style)){config.model.vits.noiseScale=.8f;config.model.vits.noiseScaleW=1f;}
+        config.silenceScale="short".equals(settings.gap)?.1f:"long".equals(settings.gap)?.4f:.2f;
         tts = new OfflineTts(config);
         sampleRate = tts.getSampleRate();
         speakers = Math.max(1, tts.getNumSpeakers());
-        setSpeaker(speakerId);
+        try { setSpeaker(speakerId); }
+        catch (RuntimeException invalid) { tts.release(); throw invalid; }
     }
 
-    /** Selects a speaker of a multi-speaker pack; unknown ids fall back to speaker 0. */
-    public void setSpeaker(int id) { speakerId = id >= 0 && id < speakers ? id : 0; }
+    /** A descriptor/model mismatch must fail, never silently read with another speaker. */
+    public void setSpeaker(int id) {
+        if(id<0||id>=speakers)throw new IllegalArgumentException("MODEL_SPEAKER_MISMATCH");
+        speakerId=id;
+    }
     public int speakers() { return speakers; }
 
     @Override public int sampleRate() { return sampleRate; }
@@ -56,7 +72,8 @@ public final class SherpaSynthesizer implements NarrationPipeline.Synthesizer {
         GeneratedAudio audio = tts.generate(text, speakerId, speed, samples -> cancel.cancelled() ? 0 : 1);
         if (audio == null || audio.getSamples() == null) throw new IllegalStateException("no audio");
         if (audio.getSampleRate() != sampleRate) throw new IllegalStateException("sample rate changed");
-        return audio.getSamples();
+        if(cancel.cancelled())return new float[0];
+        return PcmEffects.apply(audio.getSamples(),sampleRate,settings.pitch,settings.volume,settings.pauseMs);
     }
 
     public synchronized void release() { released = true; tts.release(); }

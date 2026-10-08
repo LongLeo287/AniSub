@@ -22,9 +22,10 @@ subtitle file. Shipping wire contract: protocol **major 1 / minor 2**, see
 - Deferred to a later release: the voice manager (more voices such as male or Google voices, voice
   switching UI beyond the Vietnamese/English language choice). 0.3.0 ships one Vietnamese and one English voice.
 - No capture, no microphone, no cloud translation or TTS, no paid API. Subtitle text is never
-  logged. AniSub has **no INTERNET permission** (ML Kit's request is removed): all downloads go through
-  Android's DownloadManager, so ML Kit's own in-process Firebase Installations / Remote Config calls
-  cannot connect.
+  logged. Owner approved **INTERNET permission on 08-10-2026** after Android DownloadProvider
+  rejected downloads without it. Pack/catalog downloads still use DownloadManager with integrity
+  checks. Telemetry discovery stays disabled, but INTERNET is app-wide: it also enables dependency
+  network clients, not a per-host or telemetry firewall.
 - Trust: callers are authorized at runtime (sending UID -> package `com.anibox.tv` -> same signing
   certificate). No install-time permission is required, so installing AniBox before AniSub works.
   Debug builds of AniSub (only) also accept `com.anibox.tv.debug` with the same signer check, so

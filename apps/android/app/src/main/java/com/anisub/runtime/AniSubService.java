@@ -14,6 +14,7 @@ import com.anisub.runtime.translate.TextCleaner;
 import com.anisub.runtime.translate.TranslationScheduler;
 import com.anisub.runtime.voice.VoiceCatalog;
 import com.anisub.runtime.voice.VoicePackManager;
+import com.anisub.runtime.voice.VoiceRegistry;
 import org.json.*;
 import java.util.*;
 
@@ -45,6 +46,7 @@ public final class AniSubService extends Service {
     private IBinder.DeathRecipient death;
     private String session, mode = OpenRules.MODE_SYSTEM;
     private String voiceLang = LanguageTags.VI;
+    private boolean explicitSystem;
     /** Translation for this session: on, the source ("und" until detected) and a fatal failure code. */
     private boolean translating;
     private List<String> openDownload;
@@ -131,6 +133,11 @@ public final class AniSubService extends Service {
             public boolean systemReady() { return engine.ready(); }
             public boolean packReady(String lang) { VoicePackManager.Status s = host.packStatus(lang); return s != null && s.ready() && host.engine() != null; }
             public Set<String> packVoices(String lang) { return voiceIds(host.packStatus(lang)); }
+            public boolean knownAiVoice(String id,String lang){VoiceRegistry.Entry e=host.registry().find(id);return e!=null&&e.kind==VoiceRegistry.Kind.AI&&lang.equals(e.language);}
+            public boolean voiceEnabled(String id){VoiceRegistry.Entry e=host.registry().find(id);return e!=null&&e.enabled;}
+            public boolean aiVoiceReady(String id,String lang){VoiceRegistry.Entry e=host.registry().find(id);return e!=null&&e.kind==VoiceRegistry.Kind.AI&&lang.equals(e.language)&&e.usable()&&host.engine()!=null;}
+            public String defaultAiVoice(String lang){return host.defaultVoice(lang);}
+            public boolean systemVoiceReady(String id,String lang){VoiceRegistry.Entry e=host.registry().find(id);return e!=null&&e.kind==VoiceRegistry.Kind.SYSTEM&&lang.equals(e.language)&&e.usable();}
             public boolean translateAvailable() { return tr != null && tr.available(); }
             public String translateUnavailableReason() { return tr == null ? "NO_ENGINE" : tr.unavailableReason(); }
             public boolean modelReady(String lang) { return tr != null && tr.modelReady(lang); }
@@ -183,8 +190,10 @@ public final class AniSubService extends Service {
             }
             List<Job> incoming = "CUES".equals(type) ? parseCues(input, id, rev, language) : Collections.<Job>emptyList();
             if (!gate.accept(type, id, rev, seq)) { error("STALE", null); return; }
+            if("OPEN".equals(type)&&!host.beginSession()){error("BACKPRESSURE",null);return;}
             // The system-voice test stays Vietnamese-only; AI mode accepts any source language (minor 2).
-            if ("CUES".equals(type) && Objects.equals(session, id) && !OpenRules.MODE_AI.equals(mode) && !"vi".equals(language)) throw new JSONException("cue language");
+            if ("CUES".equals(type) && Objects.equals(session, id) && !OpenRules.MODE_AI.equals(mode)
+                    && !(explicitSystem?voiceLang.equals(LanguageTags.base(language)):"vi".equals(language))) throw new JSONException("cue language");
             boolean newSession = "OPEN".equals(type) || !Objects.equals(session, id);
             if (newSession || rev != revision) {
                 cancel(); intake.restart(pos);
@@ -212,17 +221,23 @@ public final class AniSubService extends Service {
                 playing = input.optBoolean("playing", true);
                 mode = decision.mode; userRate = decision.rate; voiceLang = decision.voiceLang;
                 boolean ai = OpenRules.MODE_AI.equals(mode);
-                host.setSessionActive(ai);
+                explicitSystem=!ai&&decision.voiceId!=null;
+                String selected=ai?(decision.voiceId!=null?decision.voiceId:host.defaultVoice(voiceLang)):decision.voiceId;
+                com.anisub.runtime.settings.AniSubPrefs.Snapshot snapshot=host.settings().snapshot(selected);
+                if(!input.has("rate")&&selected!=null)userRate=snapshot.rate;
                 if (ai) {
                     openTranslate = decision.translate; openSource = decision.source; openDownload = decision.download;
                     resetContent();
                     // A session without translation frees any translator/identifier a previous one left.
                     if (!openTranslate && host.translation() != null) host.translation().releaseClients();
-                    host.engine().setLanguage(voiceLang);
-                    host.engine().setVoice(decision.voiceId != null ? decision.voiceId : host.defaultVoice());
-                    host.engine().load();
+                    host.engine().configure(voiceLang,selected,snapshot);
                 }
-                else if (host.engine() != null) host.engine().scheduleIdleUnload(); // free native memory after an AI session
+                else {
+                    SystemTestSpeechEngine system=(SystemTestSpeechEngine)engine;
+                    if(explicitSystem){if(!system.select(host.registry().find(selected),snapshot)){error("UNAVAILABLE",null);session=null;host.setSessionActive(false);return;}}
+                    else system.legacy();
+                    if(host.engine()!=null)host.engine().scheduleIdleUnload();
+                }
             }
             else {
                 cancel(); intake.restart(pos);
@@ -595,6 +610,8 @@ public final class AniSubService extends Service {
             JSONObject result = Capabilities.build(engine != null && engine.ready(), engine == null ? null : engine.state(),
                     host.packStatuses(), tr == null ? Capabilities.TranslateInfo.none("NO_ENGINE") : tr.info(),
                     host.engineState(), host.versionName(), host.versionCode());
+            result = Capabilities.withReadingPreferences(result, host.settings());
+            result = Capabilities.withVoiceMetadata(result, host.registry());
             // Progress ticks alone do not spam the client; state/engine changes always go out.
             String signature = Capabilities.signature(result);
             if (signature.equals(lastCapabilities)) return;

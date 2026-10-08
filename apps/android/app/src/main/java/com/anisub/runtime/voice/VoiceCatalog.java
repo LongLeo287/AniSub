@@ -19,9 +19,9 @@ import org.json.JSONObject;
  */
 public final class VoiceCatalog {
     public static final int SCHEMA = 1;
+    public static final int MAX_TEXT_UNITS = 256 * 1024, MAX_BYTES = 1024 * 1024, MAX_VOICES = 64;
     public static final Set<String> ALLOWED_HOSTS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
-            "github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com",
-            "huggingface.co", "cdn-lfs.huggingface.co", "cdn-lfs.hf.co", "cas-bridge.xethub.hf.co")));
+            "github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com")));
     public static final long MAX_PACK_BYTES = 512L << 20;
     /** Voice languages a pack may speak (protocol minor 2 voiceLang). */
     public static final Set<String> LANGUAGES = Collections.unmodifiableSet(new HashSet<>(Arrays.asList("vi", "en")));
@@ -45,13 +45,18 @@ public final class VoiceCatalog {
         public final List<Voice> voices;
         public final List<PackFile> files;
         public final long totalBytes;
+        /** Original validated descriptor, retained for immutable id/version comparisons. */
+        public final String descriptorJson;
+        private final String immutable;
         Pack(JSONObject o) throws JSONException {
+            descriptorJson = o.toString(); immutable=canonical(o);
             id = id(o.getString("id")); version = id(o.getString("version"));
             name = text(o.getString("name"), 120); language = o.getString("language");
             engine = o.getString("engine"); license = text(o.getString("license"), 400);
             licenseUrl = https(o.getString("licenseUrl"), false); attribution = text(o.getString("attribution"), 1200);
             model = o.getString("model"); tokens = o.getString("tokens"); dataDir = o.getString("dataDir");
-            sampleRate = o.getInt("sampleRate");
+            sampleRate = (int) integer(o, "sampleRate", 8000, 48000);
+            if (!dataDir.matches("[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}")) throw new JSONException("dataDir");
             release = id(o.optString("release", "voices-v1"));
             if (!LANGUAGES.contains(language) || !"sherpa-onnx-vits".equals(engine) || sampleRate < 8000 || sampleRate > 48000)
                 throw new JSONException("unsupported pack");
@@ -60,31 +65,34 @@ public final class VoiceCatalog {
             Set<String> vids = new HashSet<>();
             for (int i = 0; i < va.length(); i++) {
                 JSONObject v = va.getJSONObject(i);
-                Voice voice = new Voice(id(v.getString("id")), text(v.getString("name"), 80), v.getInt("speakerId"),
+                Voice voice = new Voice(id(v.getString("id")), text(v.getString("name"), 80), (int) integer(v, "speakerId", 0, 65535),
                         v.optString("gender", "unknown"), v.optString("accent", "unknown"));
+                if (!Arrays.asList("male", "female", "unknown").contains(voice.gender)
+                        || !Arrays.asList("north", "central", "south", "us", "en-US", "unknown").contains(voice.accent)) throw new JSONException("voice metadata");
                 if (voice.speakerId < 0 || !vids.add(voice.id)) throw new JSONException("voice");
                 vs.add(voice);
             }
             voices = Collections.unmodifiableList(vs);
             List<PackFile> fs = new ArrayList<>(); JSONArray fa = o.getJSONArray("files");
             if (fa.length() < 1 || fa.length() > 64) throw new JSONException("files");
-            long total = 0; Set<String> paths = new HashSet<>();
+            long total = 0; Set<String> paths = new HashSet<>(), exactPaths = new HashSet<>();
             for (int i = 0; i < fa.length(); i++) {
                 JSONObject f = fa.getJSONObject(i);
                 String sha = f.getString("sha256").toLowerCase(Locale.ROOT);
                 if (!sha.matches("[0-9a-f]{64}")) throw new JSONException("sha256");
-                long bytes = f.getLong("bytes");
+                long bytes = integer(f, "bytes", 1, MAX_PACK_BYTES);
                 if (bytes <= 0 || bytes > MAX_PACK_BYTES) throw new JSONException("bytes");
                 JSONArray ua = f.getJSONArray("urls"); List<String> urls = new ArrayList<>();
                 if (ua.length() < 1 || ua.length() > 4) throw new JSONException("urls");
                 for (int u = 0; u < ua.length(); u++) urls.add(https(ua.getString(u), true));
                 String path = f.getString("path");
                 if (!paths.add(path.toLowerCase(Locale.ROOT))) throw new JSONException("duplicate path");
+                exactPaths.add(path);
                 fs.add(new PackFile(path, bytes, sha, text(f.getString("license"), 200), Collections.unmodifiableList(urls)));
                 total += bytes;
             }
             if (total > MAX_PACK_BYTES) throw new JSONException("pack too large");
-            if (!paths.contains(model.toLowerCase(Locale.ROOT)) || !paths.contains(tokens.toLowerCase(Locale.ROOT))) throw new JSONException("model files");
+            if (!exactPaths.contains(model) || !exactPaths.contains(tokens)) throw new JSONException("model files");
             files = Collections.unmodifiableList(fs); totalBytes = total;
             manifest(); // validates paths (no traversal, no executable payloads) eagerly
         }
@@ -108,28 +116,63 @@ public final class VoiceCatalog {
     }
 
     public final List<Pack> packs;
+    public final long catalogVersion;
 
-    private VoiceCatalog(List<Pack> packs) { this.packs = packs; }
+    private VoiceCatalog(List<Pack> packs, long version) { this.packs = packs; this.catalogVersion = version; }
 
     public static VoiceCatalog parse(String json) throws JSONException {
-        if (json == null || json.length() > 256 * 1024) throw new JSONException("catalog size");
+        if (json == null || json.length() > MAX_TEXT_UNITS || json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > MAX_BYTES) throw new JSONException("catalog size");
         JSONObject root = new JSONObject(json);
-        if (root.getInt("schemaVersion") != SCHEMA) throw new JSONException("catalog schema");
+        if (integer(root, "schemaVersion", SCHEMA, SCHEMA) != SCHEMA) throw new JSONException("catalog schema");
+        long version = root.has("catalogVersion") ? integer(root, "catalogVersion", 1, Integer.MAX_VALUE) : 1;
         JSONArray pa = root.getJSONArray("packs");
         if (pa.length() > 16) throw new JSONException("packs");
-        List<Pack> out = new ArrayList<>(); Set<String> ids = new HashSet<>();
+        List<Pack> out = new ArrayList<>(); Set<String> ids = new HashSet<>(), voiceIds = new HashSet<>();
         for (int i = 0; i < pa.length(); i++) {
             Pack p;
             try { p = new Pack(pa.getJSONObject(i)); } catch (IllegalArgumentException e) { throw new JSONException("pack: " + e.getMessage()); }
             if (!ids.add(p.id)) throw new JSONException("duplicate pack");
+            for (Voice v : p.voices) if (!voiceIds.add(v.id) || voiceIds.size() > MAX_VOICES) throw new JSONException("duplicate or excess voice");
             out.add(p);
         }
-        return new VoiceCatalog(Collections.unmodifiableList(out));
+        return new VoiceCatalog(Collections.unmodifiableList(out), version);
     }
 
     public Pack find(String id) { for (Pack p : packs) if (p.id.equals(id)) return p; return null; }
     /** The legacy (minor 1) pack: the first one, Vietnamese. */
-    public Pack defaultPack() { return packs.isEmpty() ? null : packs.get(0); }
+    public Pack defaultPack() { return forLanguage("vi"); }
+    public Pack forVoice(String id) { for (Pack p : packs) if (p.voice(id) != null && id != null) return p; return null; }
+    public List<Voice> voices() { List<Voice> out = new ArrayList<>(); for (Pack p : packs) out.addAll(p.voices); return Collections.unmodifiableList(out); }
+
+    /** Accept updates only above the bundled and persisted high-water mark; an id/version is immutable. */
+    public static VoiceCatalog update(String json, VoiceCatalog bundled, VoiceCatalog current) throws JSONException {
+        VoiceCatalog next = parse(json);
+        JSONObject root = new JSONObject(json);
+        integer(root, "catalogVersion", 1, Integer.MAX_VALUE);
+        if (next.catalogVersion <= Math.max(bundled.catalogVersion, current.catalogVersion)) throw new JSONException("catalog rollback");
+        if (next.find("vi-vais1000-medium") == null) throw new JSONException("bootstrap missing");
+        for (VoiceCatalog previous : Arrays.asList(bundled, current)) for (Pack p : previous.packs) {
+            Pack n = next.find(p.id);
+            if (n != null && n.version.equals(p.version) && !n.immutable.equals(p.immutable)) throw new JSONException("immutable pack rewrite");
+        }
+        return next;
+    }
+    private static String canonical(Object value) throws JSONException {
+        if (value instanceof JSONObject) {
+            JSONObject o = (JSONObject)value; java.util.TreeSet<String> keys = new java.util.TreeSet<>();
+            java.util.Iterator<String> it = o.keys(); while (it.hasNext()) keys.add(it.next());
+            StringBuilder b = new StringBuilder("{"); for (String k : keys) b.append(JSONObject.quote(k)).append(':').append(canonical(o.get(k))).append(','); return b.append('}').toString();
+        }
+        if (value instanceof JSONArray) { JSONArray a = (JSONArray)value; StringBuilder b = new StringBuilder("["); for (int i = 0; i < a.length(); i++) b.append(canonical(a.get(i))).append(','); return b.append(']').toString(); }
+        // Android's org.json does not expose valueToString; array serialization
+        // uses its public encoder with the same JSON scalar semantics.
+        String encoded = new JSONArray().put(value).toString();
+        return encoded.substring(1, encoded.length() - 1);
+    }
+    private static long integer(JSONObject o, String key, long lo, long hi) throws JSONException {
+        Object v = o.get(key); if (!(v instanceof Integer) && !(v instanceof Long)) throw new JSONException("integer required");
+        long n = ((Number)v).longValue(); if (n < lo || n > hi) throw new JSONException("integer bounds"); return n;
+    }
     /** The first pack speaking {@code language} ("vi" / "en"), or null. */
     public Pack forLanguage(String language) { for (Pack p : packs) if (p.language.equals(language)) return p; return null; }
 

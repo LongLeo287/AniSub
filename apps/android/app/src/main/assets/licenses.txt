@@ -60,5 +60,9 @@ GÓI GIỌNG (TẢI RIÊNG KHI BẠN ĐỒNG Ý, KHÔNG NẰM TRONG APK)
 • espeak-ng-data (Việt, Anh) — GPL-3.0-or-later.
 
 Toàn văn giấy phép: https://www.gnu.org/licenses/gpl-3.0.html,
+Sonic Java: Apache-2.0, Copyright 2010, 2011 Bill Cox.
+Nguồn: https://github.com/waywardgeek/sonic (b93885dcb70aae50c6f76b0fe4e0868f029a077e).
+Cake sid0 Ngọc Lan / sid2 Quang Huy: ứng viên đã duyệt, chưa phát hành trong đợt này.
+MIT cho weights không xác nhận quyền/đồng ý của giọng nguồn trong dữ liệu tổng hợp voice-cloning.
 https://www.apache.org/licenses/LICENSE-2.0, https://opensource.org/license/mit,
 https://creativecommons.org/licenses/by/4.0/

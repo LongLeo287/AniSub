@@ -249,6 +249,139 @@
           ]
         }
       ]
+    },
+    {
+      "id": "vi-cake-piper-pgl-v4",
+      "version": "1",
+      "name": "Cake Piper PGL v4 (tiếng Việt)",
+      "language": "vi",
+      "engine": "sherpa-onnx-vits",
+      "sampleRate": 22050,
+      "release": "voices-vi-cake-v1",
+      "license": "Weights: MIT (CakeByVPBank); tokens: Apache-2.0 (sherpa-onnx conversion); espeak-ng-data: GPL-3.0-or-later. Synthetic teacher-source rights and consent are not established; see attribution.",
+      "licenseUrl": "https://github.com/LongLeo287/AniSub/blob/main/docs/voices.md",
+      "attribution": "CakeByVPBank piper-pgl-v4 Vietnamese Piper/VITS weights; source model card identifies MIT weights. Selected speakers only: sid0 Ngọc Lan (female, north) and sid2 Quang Huy (male, north). The card says training audio is synthetic/distilled from OmniVoice and VoxCPM2 voice-cloning teachers; identities, rights and consent for those source voices are not established in the card. This provenance limitation is disclosed and is not resolved by the weights license. Converted tokens are attributed Apache-2.0 to sherpa-onnx conversion; phonemizer data is espeak-ng GPL-3.0-or-later.",
+      "model": "model.onnx",
+      "tokens": "tokens.txt",
+      "dataDir": "espeak-ng-data",
+      "voices": [
+        {
+          "id": "cake-ngoc-lan",
+          "name": "Ngọc Lan (Cake sid0)",
+          "speakerId": 0,
+          "gender": "female",
+          "accent": "north"
+        },
+        {
+          "id": "cake-quang-huy",
+          "name": "Quang Huy (Cake sid2)",
+          "speakerId": 2,
+          "gender": "male",
+          "accent": "north"
+        }
+      ],
+      "files": [
+        {
+          "path": "model.onnx",
+          "bytes": 77101122,
+          "sha256": "9f9a5e43541c9504bb15eda2c74986618cb19885a661e6cb306de4b3e9da21c2",
+          "license": "MIT (CakeByVPBank/piper-pgl-v4 weights; synthetic teacher-source provenance and consent are not established by this license)",
+          "urls": [
+            "https://github.com/LongLeo287/AniSub/releases/download/voices-vi-cake-v1/cake-model.onnx"
+          ]
+        },
+        {
+          "path": "tokens.txt",
+          "bytes": 968,
+          "sha256": "e8a50ae0c75612d18cfcf3f90800dca79f961e3ed97f9574f3535194469187fd",
+          "license": "Apache-2.0 (sherpa-onnx conversion tokens; as recorded by the verified conversion provenance)",
+          "urls": [
+            "https://github.com/LongLeo287/AniSub/releases/download/voices-vi-cake-v1/cake-tokens.txt"
+          ]
+        },
+        {
+          "path": "MODEL_CARD.md",
+          "bytes": 13919,
+          "sha256": "bb1759a72f894359045f0a86bb4866773b2960128bcc942fd0e93410c55b8499",
+          "license": "MIT (CakeByVPBank/piper-pgl-v4 weights; synthetic teacher-source provenance and consent are not established by this license)",
+          "urls": [
+            "https://github.com/LongLeo287/AniSub/releases/download/voices-vi-cake-v1/cake-MODEL_CARD.md"
+          ]
+        },
+        {
+          "path": "espeak-ng-data/phontab",
+          "bytes": 55796,
+          "sha256": "886f3fa402cb0ba73d483aa8ad000af47a6b7cc06293c75a97913fba68a530f6",
+          "license": "GPL-3.0-or-later (espeak-ng-data)",
+          "urls": [
+            "https://github.com/LongLeo287/AniSub/releases/download/voices-vi-cake-v1/cake-espeak-ng-data.phontab"
+          ]
+        },
+        {
+          "path": "espeak-ng-data/phonindex",
+          "bytes": 39074,
+          "sha256": "3ca7b8fa3b42624e4b0f152707e7a39245fce569aa99ea47c055d9e622fcf0c4",
+          "license": "GPL-3.0-or-later (espeak-ng-data)",
+          "urls": [
+            "https://github.com/LongLeo287/AniSub/releases/download/voices-vi-cake-v1/cake-espeak-ng-data.phonindex"
+          ]
+        },
+        {
+          "path": "espeak-ng-data/phondata",
+          "bytes": 550424,
+          "sha256": "4e0288957874029a8c3c9f41a8f517ad4bf18127046decbdd4b9d1d6807ce3a3",
+          "license": "GPL-3.0-or-later (espeak-ng-data)",
+          "urls": [
+            "https://github.com/LongLeo287/AniSub/releases/download/voices-vi-cake-v1/cake-espeak-ng-data.phondata"
+          ]
+        },
+        {
+          "path": "espeak-ng-data/intonations",
+          "bytes": 2040,
+          "sha256": "3f8af65fd3eda9759a10f021d61361c120871f463515229c925995c7f90918cc",
+          "license": "GPL-3.0-or-later (espeak-ng-data)",
+          "urls": [
+            "https://github.com/LongLeo287/AniSub/releases/download/voices-vi-cake-v1/cake-espeak-ng-data.intonations"
+          ]
+        },
+        {
+          "path": "espeak-ng-data/vi_dict",
+          "bytes": 52608,
+          "sha256": "bbf7cab4ba733b2f5d9d3b61eb1194ef745232fa3adebb4bc92456e948cb3722",
+          "license": "GPL-3.0-or-later (espeak-ng-data)",
+          "urls": [
+            "https://github.com/LongLeo287/AniSub/releases/download/voices-vi-cake-v1/cake-espeak-ng-data.vi_dict"
+          ]
+        },
+        {
+          "path": "espeak-ng-data/en_dict",
+          "bytes": 166944,
+          "sha256": "71bd330ba8a2e3e8076e631508208ef49449d6147c17b7bd2b4b1e1468292e35",
+          "license": "GPL-3.0-or-later (espeak-ng-data)",
+          "urls": [
+            "https://github.com/LongLeo287/AniSub/releases/download/voices-vi-cake-v1/cake-espeak-ng-data.en_dict"
+          ]
+        },
+        {
+          "path": "espeak-ng-data/lang/aav/vi",
+          "bytes": 111,
+          "sha256": "3199c980f9e23a88a2aa693cd631bf4fcb0f3408c4272bc01b7ac0ff8e79d778",
+          "license": "GPL-3.0-or-later (espeak-ng-data)",
+          "urls": [
+            "https://github.com/LongLeo287/AniSub/releases/download/voices-vi-cake-v1/cake-espeak-ng-data.lang.aav.vi"
+          ]
+        },
+        {
+          "path": "espeak-ng-data/lang/gmw/en",
+          "bytes": 140,
+          "sha256": "4605d5330801de3641c6e366d15f129ea1f5ffbce8722642aba01ace07ab9c83",
+          "license": "GPL-3.0-or-later (espeak-ng-data)",
+          "urls": [
+            "https://github.com/LongLeo287/AniSub/releases/download/voices-vi-cake-v1/cake-espeak-ng-data.lang.gmw.en"
+          ]
+        }
+      ]
     }
-  ]
+  ],
+  "catalogVersion": 2
 }

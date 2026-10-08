@@ -8,7 +8,7 @@ import java.io.OutputStream;
 /**
  * Resumable transfer over an {@link HttpSource} (direct HTTP). Used by the JVM tests and the
  * debug-only local pack source; release builds download through {@link SystemDownloadFetcher}
- * (AniSub has no INTERNET permission). Continues an existing partial {@code target}.
+ * (which requires caller INTERNET permission). Continues an existing partial {@code target}.
  */
 public final class HttpFetcher implements VoicePackManager.FileFetcher {
     private final HttpSource http;

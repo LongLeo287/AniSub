@@ -13,8 +13,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 /**
- * Fetches a pinned file through Android's system DownloadManager, so AniSub itself needs no INTERNET
- * permission (owner/root decision 07-10-2026, ANISUB-004 P1). The download lands in the download
+ * Fetches a pinned file through Android's system DownloadManager. DownloadProvider requires INTERNET
+ * on the caller too (owner approved 08-10-2026 after device verification). The download lands in the download
  * provider's cache, is copied into AniSub's private staging file, and the provider entry is removed.
  * The caller verifies size and SHA-256 afterwards (never trusted before that), then installs
  * atomically. Blocking: call on a worker thread only. Redirects are followed by the system service,

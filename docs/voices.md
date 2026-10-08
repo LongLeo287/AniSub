@@ -88,3 +88,40 @@ Upstream fallback: sherpa-onnx publishes this voice only as a `.tar.bz2` archive
 hosts a different (unconverted) ONNX file, so no byte-identical per-file upstream mirror exists.
 The catalog therefore lists the AniSub release URL only; a second allowlisted mirror (for example
 a Hugging Face repo with the same files) can be added later as an extra `urls` entry.
+
+## Cake `vi-cake-piper-pgl-v4`, version 1 (candidate `voices-vi-cake-v1`)
+
+Prepared from the owner-verified flat staging set with `apps/android/tools/build-cake-voice-pack.mjs`.
+The script pins all 11 input sizes and SHA-256 values and rejects missing, additional or modified
+files. The reproducible outputs are ignored under `apps/android/build/voices-vi-cake-v1/` and
+`apps/android/build/catalog-v1/catalog.json`; this catalog is a candidate, not the APK-pinned
+catalog and not yet a reachable release. The root task owns the data-only release publication.
+
+| Item | Value |
+|---|---|
+| Voice | Cake `piper-pgl-v4`, Piper/VITS, 22,050 Hz; approved voices only: sid0 Ngọc Lan (female, north) and sid2 Quang Huy (male, north) |
+| Source model | CakeByVPBank `piper-pgl-v4-vi_VN-version39_epoch39`; source-card weights claim MIT |
+| Download | 11 files, 77,983,307 bytes total: model 77,101,122; tokens 1,129; model card 13,919; eight eSpeak files 867,137 bytes |
+| Model license | MIT for weights as stated by the Cake model card; this does not establish rights to the teacher voices or synthetic training data |
+| Conversion tokens | Apache-2.0, attributed to the sherpa-onnx conversion |
+| Phonemizer data | Eight-file Vietnamese/English espeak-ng-data subset, GPL-3.0-or-later |
+| Candidate release | `voices-vi-cake-v1`; URLs use the exact filenames in the ignored candidate asset directory and remain unavailable until root publishes them |
+| Catalog candidate | `catalogVersion: 2`, existing packs retained unchanged, new pack `vi-cake-piper-pgl-v4` version `1` |
+
+The source card says the training audio is synthetic and distilled from OmniVoice and VoxCPM2
+voice-cloning teachers. It does not establish the source speakers' identities, rights or consent.
+That limitation is stated in the candidate catalog attribution; it remains unresolved. Only sid0
+and sid2 are admitted here; sid1, sid3 and sid4 are excluded. The 77.1 MB model size says nothing
+about total package size, P650 memory, realtime performance or voice-quality acceptance. Those
+remain separate gates. No APK catalog change or app bundling is part of this candidate build.
+
+To reproduce the candidate outputs from the verified staged directory:
+
+```powershell
+node apps/android/tools/build-cake-voice-pack.mjs <flat-stage-dir> apps/android/build/voices-vi-cake-v1 apps/android/app/src/main/assets/voice-catalog.json
+node --test apps/android/tools/build-cake-voice-pack.test.mjs
+```
+
+Before publication, the root task should confirm the final 11-file directory against the pinned
+manifest in the builder and create only the data release tagged `voices-vi-cake-v1`. Until then,
+the catalog's release URLs intentionally do not resolve.

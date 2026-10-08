@@ -1,11 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.software.leanback" android:required="false" />
-    <!-- ANISUB-004 P1 (root decision 07-10-2026): AniSub has NO INTERNET permission. ML Kit's manifest
-         asks for it; it is removed here, so ML Kit's in-process Firebase Installations / Remote Config
-         clients cannot open sockets. Voice packs and ML Kit translation models are fetched by Android's
-         system DownloadManager (its own process and permission), then verified inside AniSub. -->
-    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <!-- Owner approved 08-10-2026: DownloadProvider requires INTERNET on the calling UID too.
+         Keep DownloadManager transport, pinned integrity and disabled usage-log discovery below.
+         This permission also enables dependency network clients; it is not a per-host firewall. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- Voice-pack downloads run hidden in the download provider's cache (copied, verified, removed). -->
     <uses-permission android:name="android.permission.DOWNLOAD_WITHOUT_NOTIFICATION" />
     <!-- Kept defined for compatibility, but NOT required by the service or activity: AniBox is

@@ -220,6 +220,25 @@ public class VoicePackManagerTest {
         assertEquals("superseded version removed at next start", 1, store.registry().versions().size());
     }
 
+    @Test public void updateAndRestartPreserveLastKnownGoodUntilReplacementIsReady() throws Exception {
+        http.serve(files);
+        VoicePackManager first = manager(catalogJson("1", files), null);
+        first.download(true); settle(first);
+        try (LoadLease lease = first.acquire()) { store.markReady(lease); }
+        Map<String, byte[]> v2 = new LinkedHashMap<>(files);
+        v2.put("model.onnx", bytes(1_500_000, 9)); http.serve(v2);
+        VoicePackManager next = manager(catalogJson("2", v2), null);
+        next.download(true); assertEquals("2", settle(next).installedVersion);
+        assertEquals("1", store.registry().lastKnownGood("vi-test").manifest().version);
+        assertEquals(2, store.registry().versions().size());
+        VoicePackManager restarted = manager(catalogJson("2", v2), null);
+        assertEquals(2, store.registry().versions().size());
+        try (LoadLease lease = restarted.acquire()) { store.markReady(lease); }
+        manager(catalogJson("2", v2), null);
+        assertEquals("2", store.registry().lastKnownGood("vi-test").manifest().version);
+        assertEquals(1, store.registry().versions().size());
+    }
+
     @Test public void hashMismatchIsRejectedAndNothingInstalled() throws Exception {
         Map<String, byte[]> tampered = new LinkedHashMap<>(files);
         byte[] model = files.get("model.onnx").clone(); model[5] ^= 1; tampered.put("model.onnx", model);
