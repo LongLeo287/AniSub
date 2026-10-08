@@ -101,7 +101,7 @@ public final class AniSubService extends Service {
             public void translated(String cueId) { drain(); }
             public void failed(String cueId, String code) { drain(); }
         });
-        engine = new SystemTestSpeechEngine(this, new SpeechEngine.Listener() {
+        engine = new SystemTestSpeechEngine(this, host.systemVoices(), new SpeechEngine.Listener() {
             public void started(String id) { handler.post(() -> { if (active != null && id.equals(active.utterance) && !active.started) { active.started = true; event("STARTED", active, null); } }); }
             public void finished(String id) { handler.post(() -> terminal(id, null)); }
             public void failed(String id) { handler.post(() -> terminal(id, "PROVIDER_FAILED")); }
@@ -611,7 +611,7 @@ public final class AniSubService extends Service {
                     host.packStatuses(), tr == null ? Capabilities.TranslateInfo.none("NO_ENGINE") : tr.info(),
                     host.engineState(), host.versionName(), host.versionCode());
             result = Capabilities.withReadingPreferences(result, host.settings());
-            result = Capabilities.withVoiceMetadata(result, host.registry());
+            result = Capabilities.withVoiceMetadata(result, host.registry(), host.systemVoices().state());
             // Progress ticks alone do not spam the client; state/engine changes always go out.
             String signature = Capabilities.signature(result);
             if (signature.equals(lastCapabilities)) return;

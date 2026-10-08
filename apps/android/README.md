@@ -19,8 +19,9 @@ subtitle file. Shipping wire contract: protocol **major 1 / minor 2**, see
   ML Kit from Google (dl.google.com) through the system DownloadManager: Vietnamese at the first run,
   others automatically when a session needs them ("Tự tải gói dịch khi cần", default on) or from the
   settings list; deletable. ML Kit's telemetry backend and start-up providers are removed.
-- Deferred to a later release: the voice manager (more voices such as male or Google voices, voice
-  switching UI beyond the Vietnamese/English language choice). 0.3.0 ships one Vietnamese and one English voice.
+- 0.4.0 adds the voice manager: catalog-driven voices (default Vietnamese VAIS, Cake Ngọc Lan / Quang Huy,
+  English LJSpeech), device system voices, per-voice rate/pitch/volume, storage cleanup. The default Vietnamese
+  VAIS pack is never deletable or disableable (it backs the legacy CAPABILITIES fields AniBox 2.9.6 reads).
 - No capture, no microphone, no cloud translation or TTS, no paid API. Subtitle text is never
   logged. All downloads go through Android's DownloadManager and are verified in AniSub. AniSub holds the
   INTERNET permission again from 0.3.1 (the DownloadProvider refuses callers without it, which broke

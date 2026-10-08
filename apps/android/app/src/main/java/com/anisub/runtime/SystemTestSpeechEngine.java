@@ -13,28 +13,24 @@ import com.anisub.runtime.voice.VoiceRegistry;
 /** Explicit test-only system voice. Never requests install, network, or audio focus. */
 final class SystemTestSpeechEngine implements SpeechEngine {
     private TextToSpeech tts;
-    private boolean ready;
-    private Voice legacyVoice;
+    private volatile boolean ready;
+    private volatile Voice legacyVoice;
     private String language="vi";
     private float volume=1f;
-    private String state = "initializing";
-    SystemTestSpeechEngine(Context context, final Listener listener, final Runnable changed) {
+    private volatile String state = "initializing";
+    private final SystemVoices inventory;
+    private final java.util.concurrent.ExecutorService scanner = java.util.concurrent.Executors.newSingleThreadExecutor(r -> { Thread t = new Thread(r, "anisub-system-tts-scan"); t.setDaemon(true); return t; });
+    SystemTestSpeechEngine(Context context, SystemVoices inventory, final Listener listener, final Runnable changed) {
+        this.inventory = inventory;
         tts = new TextToSpeech(context, status -> {
             if (status == TextToSpeech.SUCCESS && tts != null) {
                 tts.setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build());
-                Set<Voice> voices = tts.getVoices();
-                if (voices != null) for (Voice voice : voices) {
-                    if ("vi".equals(voice.getLocale().getLanguage()) && !voice.isNetworkConnectionRequired()
-                            && !voice.getFeatures().contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED)
-                            && tts.isLanguageAvailable(voice.getLocale()) >= TextToSpeech.LANG_AVAILABLE
-                            && tts.setVoice(voice) == TextToSpeech.SUCCESS) {
-                        ready = true; legacyVoice=voice; break;
-                    }
-                }
-                state = ready ? "local-vietnamese-ready" : "local-vietnamese-missing";
-            } else state = "engine-unavailable";
-            changed.run();
+                final TextToSpeech client = tts;
+                // getVoices / isLanguageAvailable are binder calls: never on the main thread.
+                try { scanner.execute(() -> scanLegacy(client, changed)); }
+                catch (java.util.concurrent.RejectedExecutionException released) { /* engine already released */ }
+            } else { state = "engine-unavailable"; changed.run(); }
         });
         tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
             @Override public void onStart(String id) { listener.started(id); }
@@ -43,12 +39,27 @@ final class SystemTestSpeechEngine implements SpeechEngine {
             @Override public void onStop(String id, boolean interrupted) { listener.finished(id); }
         });
     }
+    private void scanLegacy(TextToSpeech client, Runnable changed) {
+        try {
+            Set<Voice> voices = client.getVoices();
+            if (voices != null) for (Voice voice : voices) {
+                if ("vi".equals(voice.getLocale().getLanguage()) && !voice.isNetworkConnectionRequired()
+                        && (voice.getFeatures() == null || !voice.getFeatures().contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED))
+                        && client.isLanguageAvailable(voice.getLocale()) >= TextToSpeech.LANG_AVAILABLE
+                        && client.setVoice(voice) == TextToSpeech.SUCCESS) {
+                    ready = true; legacyVoice = voice; break;
+                }
+            }
+            state = ready ? "local-vietnamese-ready" : "local-vietnamese-missing";
+        } catch (RuntimeException failed) { state = "engine-unavailable"; }
+        changed.run();
+    }
     public boolean ready() { return ready; }
     public String state() { return state; }
     public boolean select(VoiceRegistry.Entry selected,AniSubPrefs.Snapshot settings){
         if(tts==null||!selected.engine.equals(tts.getDefaultEngine()))return false;
-        Set<Voice> voices=tts.getVoices();if(voices!=null)for(Voice v:voices)if(selected.voiceName.equals(v.getName())&&SystemVoices.local(tts,v)
-                &&selected.language.equals(v.getLocale().getLanguage())&&tts.setVoice(v)==TextToSpeech.SUCCESS){
+        Voice v=inventory==null?null:inventory.voice(selected.engine,selected.voiceName,selected.language); // cached scan, no binder call here
+        if(v!=null&&tts.setVoice(v)==TextToSpeech.SUCCESS){
             language=selected.language;volume=settings.volume/100f;tts.setSpeechRate(settings.rate);tts.setPitch((float)Math.pow(2,settings.pitch/12.0));return true;
         }return false;
     }
@@ -62,5 +73,5 @@ final class SystemTestSpeechEngine implements SpeechEngine {
         return tts.speak(text, TextToSpeech.QUEUE_FLUSH, params, id) == TextToSpeech.SUCCESS;
     }
     public void stop() { if (tts != null) tts.stop(); }
-    public void release() { ready = false; if (tts != null) { tts.stop(); tts.shutdown(); tts = null; } }
+    public void release() { ready = false; scanner.shutdownNow(); if (tts != null) { tts.stop(); tts.shutdown(); tts = null; } }
 }

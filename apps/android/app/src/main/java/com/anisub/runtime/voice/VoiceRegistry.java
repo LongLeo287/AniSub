@@ -42,9 +42,10 @@ public final class VoiceRegistry {
             StringBuilder b=new StringBuilder("sys:"); for(byte v:bytes)b.append(String.format(Locale.ROOT,"%02x",v&255)); return b.toString();
         } catch(java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
     }
-    private final List<Entry> entries; private final AniSubPrefs prefs;
+    private final List<Entry> entries; private final AniSubPrefs prefs; private final String protectedPack;
     public VoiceRegistry(VoiceCatalog catalog, PackStates states, List<SystemVoice> systems, AniSubPrefs prefs) {
         this.prefs=prefs; List<Entry> all=new ArrayList<>();
+        protectedPack=catalog.defaultPack()==null?null:catalog.defaultPack().id;
         for(VoiceCatalog.Pack p:catalog.packs)for(VoiceCatalog.Voice v:p.voices)
             all.add(new Entry(v.id,Kind.AI,p.language,v.name,v.gender,v.accent,p.id,null,null,states.voiceInstalled(p.id,v),prefs.voiceEnabled(v.id),v.speakerId));
         if(systems!=null)for(SystemVoice s:systems)all.add(new Entry(s.id,Kind.SYSTEM,s.language,s.voiceName,
@@ -60,18 +61,14 @@ public final class VoiceRegistry {
         return null;
     }
     public boolean canMakeDefault(String id){Entry e=find(id);return e!=null&&e.usable();}
-    /** Removing a default atomically chooses another usable voice of the same kind/language. */
-    public boolean canDeletePack(String id){
-        boolean affectsVi=false;for(Entry e:entries)if(e.kind==Kind.AI&&id.equals(e.packId)&&e.usable()&&"vi".equals(e.language))affectsVi=true;
-        if(!affectsVi)return true;
-        for(Entry e:entries)if(e.kind==Kind.AI&&e.usable()&&"vi".equals(e.language)&&!id.equals(e.packId))return true;
-        return false;
-    }
+    /** The first-run (bootstrap) Vietnamese pack: it backs the legacy CAPABILITIES fields, so it is never deleted or disabled. */
+    public String protectedPackId(){return protectedPack;}
+    public boolean isProtectedPack(String packId){return protectedPack!=null&&protectedPack.equals(packId);}
+    /** The default (VAIS) pack can never be deleted; other packs may, and a removed default is repaired to another usable voice. */
+    public boolean canDeletePack(String id){return id!=null&&!isProtectedPack(id);}
     public boolean canDisable(String id){
         Entry e=find(id);if(e==null||!e.enabled)return false;
-        if(e.kind!=Kind.AI||!"vi".equals(e.language)||!e.installed)return true;
-        for(Entry v:entries)if(v.kind==Kind.AI&&v.usable()&&"vi".equals(v.language)&&!v.id.equals(id))return true;
-        return false;
+        return !(e.kind==Kind.AI&&isProtectedPack(e.packId));
     }
     public Entry replacement(Entry removed,String removedPack){
         for(Entry e:entries)if(e.kind==removed.kind&&e.language.equals(removed.language)&&e.usable()&&!e.id.equals(removed.id)

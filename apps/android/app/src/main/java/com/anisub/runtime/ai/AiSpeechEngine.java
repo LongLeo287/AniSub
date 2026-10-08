@@ -50,6 +50,9 @@ public final class AiSpeechEngine {
     private volatile String voiceId;
     private AniSubPrefs.Snapshot settings = new AniSubPrefs.Snapshot(1f,0,100,0,"normal","normal");
     private final Runnable idleUnload = this::unload;
+    /** Configuration of the resident (or loading) synthesizer; null when nothing is loaded. */
+    private String activeLang, activeVoice;
+    private AniSubPrefs.Snapshot activeSettings;
 
     /**
      * @param packs voice pack per language
@@ -93,6 +96,7 @@ public final class AiSpeechEngine {
         final String lang = language;
         final String selectedVoice = voiceId;
         final AniSubPrefs.Snapshot selectedSettings = settings;
+        activeLang = lang; activeVoice = selectedVoice; activeSettings = selectedSettings;
         final VoicePackManager voices = packs.forVoice(selectedVoice, lang);
         notifyChanged();
         final Runnable timeout = () -> {
@@ -149,7 +153,22 @@ public final class AiSpeechEngine {
     }
     /** New OPEN/preview retires the prior pipeline before taking a fresh model/config snapshot. */
     public void configure(String lang, String id, AniSubPrefs.Snapshot snapshot) {
+        synchronized (this) {
+            if (reusable(state, activeLang, activeVoice, activeSettings, lang, id, snapshot)) {
+                // Same voice and preset already resident (or loading): keep the model, only refresh the per-utterance values.
+                language = lang; voiceId = id; settings = snapshot;
+                main.removeCallbacks(idleUnload);
+                return;
+            }
+        }
         unload(); synchronized (this) { language=lang;voiceId=id;settings=snapshot; } load();
+    }
+    /** Pure rule: a resident/loading synthesizer is reused when voice, language and baked-in preset all match. */
+    public static boolean reusable(State state, String activeLang, String activeVoice, AniSubPrefs.Snapshot activeSettings,
+                                   String lang, String id, AniSubPrefs.Snapshot snapshot) {
+        return (state == State.READY || state == State.LOADING) && activeSettings != null && snapshot != null
+                && java.util.Objects.equals(activeLang, lang) && java.util.Objects.equals(activeVoice, id)
+                && activeSettings.sameSynthesis(snapshot);
     }
     /** Candidate smoke is serialized behind release/load; it can never create a second resident. */
     public String smokeTest(File dir, VoiceCatalog.Pack pack) throws InterruptedException {
@@ -203,7 +222,7 @@ public final class AiSpeechEngine {
             loadGeneration++;
             p = pipeline; s = synth; l = lease; pipeline = null; synth = null; lease = null; loadedPackVersion = null;
             loadedLanguage = null; loadedVoiceId=null; manager=loadedPacks;loadedPacks = null;
-            state = State.IDLE; error = null;
+            state = State.IDLE; error = null; activeLang = null; activeVoice = null; activeSettings = null;
         }
         main.removeCallbacks(idleUnload);
         if (p != null || s != null || l != null) {

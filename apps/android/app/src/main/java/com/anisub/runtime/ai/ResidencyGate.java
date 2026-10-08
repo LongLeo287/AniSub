@@ -2,11 +2,13 @@ package com.anisub.runtime.ai;
 
 /** One process-wide operation owner; native creation/release also stays on one engine loader. */
 public final class ResidencyGate {
-    public enum Owner { IDLE, SESSION, PREVIEW, SMOKE }
+    public enum Owner { IDLE, SESSION, PREVIEW, SMOKE, MAINTENANCE }
     private Owner owner=Owner.IDLE;
     public synchronized Owner owner(){return owner;}
     public synchronized boolean session(){if(owner!=Owner.IDLE&&owner!=Owner.SESSION)return false;owner=Owner.SESSION;return true;}
     public synchronized boolean preview(){if(owner!=Owner.IDLE)return false;owner=Owner.PREVIEW;return true;}
+    /** Exclusive owner for slow disk work (delete / clear cache): sessions and previews are refused meanwhile. */
+    public synchronized boolean maintenance(){if(owner!=Owner.IDLE)return false;owner=Owner.MAINTENANCE;return true;}
     public synchronized void end(Owner expected){if(owner==expected){owner=Owner.IDLE;notifyAll();}}
     public synchronized boolean smoke(long timeoutMs)throws InterruptedException{
         long end=System.currentTimeMillis()+timeoutMs;

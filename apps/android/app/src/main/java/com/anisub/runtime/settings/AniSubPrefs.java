@@ -80,6 +80,11 @@ public final class AniSubPrefs {
         public Snapshot(float rate, int pitch, int volume, int pauseMs, String style, String gap) {
             this.rate = rate; this.pitch = pitch; this.volume = volume; this.pauseMs = pauseMs; this.style = style; this.gap = gap;
         }
+        /** True when a loaded synthesizer built from {@code o} already renders like this one (rate is applied per utterance, not at load). */
+        public boolean sameSynthesis(Snapshot o) {
+            return o != null && pitch == o.pitch && volume == o.volume && pauseMs == o.pauseMs
+                    && java.util.Objects.equals(style, o.style) && java.util.Objects.equals(gap, o.gap);
+        }
     }
     public Snapshot snapshot(String id) { return new Snapshot(voiceRate(id), voicePitch(id), voiceVolume(id), pauseMs(), voiceStyle(id), gap()); }
 

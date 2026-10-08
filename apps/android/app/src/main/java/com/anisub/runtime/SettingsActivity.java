@@ -199,13 +199,13 @@ public final class SettingsActivity extends Activity {
         super.onStart();
         host.addListener(refresh);
         host.addEngineListener(engineListener);
+        host.systemVoices().acquire(); // keeps one TTS client for previews while this screen is visible (rescans voices)
         if (host.translation() != null) host.translation().refresh();
         render();
     }
 
     @Override protected void onResume() {
         super.onResume();
-        host.systemVoices().refresh();
         render();
     }
 
@@ -261,6 +261,7 @@ public final class SettingsActivity extends Activity {
 
     @Override protected void onStop() {
         if (host.previewActive()) host.cancelPreview();
+        host.systemVoices().release(); // shuts the settings TTS client down when nothing else uses it
         host.removeListener(refresh);
         host.removeEngineListener(engineListener);
         if (host.engine() != null) {
@@ -418,7 +419,8 @@ public final class SettingsActivity extends Activity {
         runtime += " · Engine AI: " + host.engineState();
         if (engine != null && engine.loadedLanguage() != null) runtime += " · model " + LanguageTags.displayName(engine.loadedLanguage());
         if(engine!=null&&engine.loadedVoiceId()!=null){VoiceRegistry.Entry resident=host.registry().find(engine.loadedVoiceId());if(resident!=null)runtime+=" · "+resident.name;}
-        runtime += "\nGiọng hệ thống cục bộ đã cài: " + host.systemVoices().all().size();
+        runtime += "\nGiọng hệ thống cục bộ đã cài: " + (SystemVoices.READY.equals(host.systemVoices().state()) ? String.valueOf(host.systemVoices().all().size())
+                : SystemVoices.INITIALIZING.equals(host.systemVoices().state()) ? "đang kiểm tra…" : "không đọc được");
         runtimeRow.set("Tình trạng runtime", runtime, false, true);
         storageRow.set("Bộ nhớ", "Dung lượng thực tế của gói giọng, mô hình dịch và bộ nhớ đệm · xóa an toàn", true, true);
         about.set("Giấy phép và giới thiệu", "AniSub " + host.versionName() + " (" + host.versionCode() + ") · "
@@ -546,7 +548,7 @@ public final class SettingsActivity extends Activity {
         if (Capabilities.DOWNLOADING.equals(state)) { info("Đang tải", "Mô hình " + name + " đang được tải."); return; }
         if (Capabilities.READY.equals(state)) {
             confirm("Xóa mô hình " + name + "?", "Mô hình dịch " + name + " sẽ bị xóa khỏi TV. Có thể tải lại bất cứ lúc nào.", "Xóa",
-                    () -> tr.delete(lang, ok -> runOnUiThread(this::render)));
+                    () -> tr.delete(lang, ok -> runOnUiThread(SettingsActivity.this::render)));
             return;
         }
         String message = "Mô hình dịch " + name + ": tải khoảng " + VoicePackManager.formatBytes(MlKitTranslation.APPROX_MODEL_BYTES)
@@ -554,7 +556,7 @@ public final class SettingsActivity extends Activity {
                 + "Việc tải dùng trình tải xuống của hệ thống Android. Sau khi tải, việc dịch chạy hoàn toàn trên TV; "
                 + "phụ đề không gửi đi đâu. Có thể xóa mô hình bất cứ lúc nào.";
         confirm("Tải mô hình dịch " + name + "?", message, "Đồng ý tải",
-                () -> tr.download(lang, ok -> runOnUiThread(this::render)));
+                () -> tr.download(lang, ok -> runOnUiThread(SettingsActivity.this::render)));
     }
 
     /** Translates a fixed English line into Vietnamese on the TV, shows it and speaks it. */
@@ -705,7 +707,7 @@ public final class SettingsActivity extends Activity {
                             info(current.name,detail);break;
                         case 1: previewVoice(id,"en".equals(current.language)?PREVIEW_EN:PREVIEW_VI);break;
                         case 2: if(current.usable())host.setDefaultVoice(id);else info("Chưa chọn được","Cài và bật giọng trước khi đặt mặc định.");break;
-                        case 3: String error=host.setVoiceEnabled(id,!current.enabled);if(error!=null)info("Không tắt được","Phải giữ ít nhất một giọng AI tiếng Việt khả dụng.");break;
+                        case 3: String error=host.setVoiceEnabled(id,!current.enabled);if(error!=null)info("Không tắt được","Giọng tiếng Việt mặc định (VAIS) luôn bật.");break;
                         case 4: chooseSetting(id,"Tốc độ",new String[]{"0.8×","0.9×","1.0×","1.1×","1.2×","1.3×"},4);break;
                         case 5: chooseSetting(id,"Cao độ",new String[]{"−3","−2","−1","0","+1","+2","+3"},5);break;
                         case 6: chooseSetting(id,"Âm lượng",new String[]{"0%","25%","50%","75%","100%"},6);break;
@@ -715,9 +717,12 @@ public final class SettingsActivity extends Activity {
                             confirm("Tải "+pack.name+"?",VoicePackManager.formatBytes(pack.totalBytes)+" · GitHub AniSub\n"+pack.license+"\n"+pack.attribution,"Tải",()->{if(!host.downloadPack(pack.id))info("Chưa tải được","Chờ thao tác đang chạy kết thúc.");});break;
                         case 8:
                             if(current.packId==null){info("Giọng hệ thống","AniSub không xóa dữ liệu của ứng dụng TTS khác.");break;}
-                            confirm("Xóa gói giọng?","Các giọng dùng chung gói sẽ bị xóa. Giọng mặc định cuối cùng và model đang dùng được bảo vệ.","Xóa",()->{
+                            if(!host.registry().canDeletePack(current.packId)){info("Giọng mặc định","Giọng tiếng Việt mặc định (VAIS) luôn được giữ để AniBox 2.9.6 vẫn đọc được; không xóa hay tắt được.");break;}
+                            if(host.sessionActive()){info("Đang phát trong AniBox","Dừng phát trong AniBox rồi mới xóa gói giọng.");break;}
+                            confirm("Xóa gói giọng?","Các giọng dùng chung gói sẽ bị xóa. Giọng mặc định (VAIS) và model đang dùng được bảo vệ.","Xóa",()->{
+                                if(host.sessionActive()){info("Đang phát trong AniBox","Dừng phát trong AniBox rồi mới xóa gói giọng.");return;}
                                 if(host.previewActive())host.cancelPreview();
-                                Runnable remove=()->{String result=host.deletePack(current.packId);if(result!=null)runOnUiThread(()->info("Không xóa được","Gói đang dùng hoặc là giọng AI tiếng Việt cuối cùng."));};
+                                Runnable remove=()->{String result=host.deletePack(current.packId);if(result!=null)runOnUiThread(()->info("Không xóa được","Gói đang dùng hoặc là giọng mặc định."));else runOnUiThread(SettingsActivity.this::render);};
                                 if(host.engine()!=null)host.engine().unloadThen(remove);else remove.run();
                             });break;
                         case 9:
@@ -870,6 +875,7 @@ public final class SettingsActivity extends Activity {
 
     static Set<String> defaultPackIds(VoiceRegistry registry) {
         Set<String> kept = new LinkedHashSet<>();
+        if (registry.protectedPackId() != null) kept.add(registry.protectedPackId());
         for (VoiceRegistry.Entry entry : registry.all()) if (entry.kind == VoiceRegistry.Kind.AI) {
             VoiceRegistry.Entry def = registry.defaultVoice(VoiceRegistry.Kind.AI, entry.language);
             if (def != null && def.packId != null) kept.add(def.packId);

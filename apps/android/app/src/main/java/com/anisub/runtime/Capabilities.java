@@ -131,6 +131,13 @@ public final class Capabilities {
 
     /** The reply without progress counters: equal signatures mean "nothing worth re-sending". */
     public static JSONObject withVoiceMetadata(JSONObject legacy, VoiceRegistry registry) throws JSONException {
+        return withVoiceMetadata(legacy, registry, "ready");
+    }
+    /**
+     * @param systemState "initializing" | "ready" | "unavailable": while the TTS inventory is not ready
+     *        {@code systemVoices} is omitted (never an empty list that would read as "no system voices").
+     */
+    public static JSONObject withVoiceMetadata(JSONObject legacy, VoiceRegistry registry, String systemState) throws JSONException {
         // Keep the legacy object unmodified. If optional metadata exceeds the existing
         // wire budget, drop that optional entry rather than a legacy required field.
         JSONObject out = new JSONObject(legacy.toString());
@@ -160,9 +167,14 @@ public final class Capabilities {
                 if(out.toString().length()>16384){list.remove(list.length()-1);break;}
             }
         }
+        out.put("systemVoicesState", systemState == null ? "initializing" : systemState);
+        if (!"ready".equals(systemState)) {
+            if (out.toString().length() > 16384) out.remove("systemVoicesState");
+            return out;
+        }
         JSONArray systems = new JSONArray();
         out.put("systemVoices", systems);
-        if (out.toString().length() > 16384) { out.remove("systemVoices"); return out; }
+        if (out.toString().length() > 16384) { out.remove("systemVoices"); out.remove("systemVoicesState"); return out; }
         for (VoiceRegistry.Entry entry : registry.all()) if (entry.kind == VoiceRegistry.Kind.SYSTEM) {
             JSONObject item = new JSONObject().put("id", entry.id).put("name", entry.name)
                     .put("language", entry.language).put("kind", "system").put("installed", entry.installed);

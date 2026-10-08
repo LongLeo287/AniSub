@@ -43,9 +43,11 @@ source for the binaries is the sherpa-onnx v1.13.8 tag and the dependency versio
 | ML Kit translation models (Google, downloaded by ML Kit from dl.google.com) | ML Kit Terms of Service |
 
 The ML Kit components are proprietary (no corresponding source). AniSub removes their telemetry
-backend (`TransportBackendDiscovery`) and start-up providers, and has **no INTERNET permission**:
-ML Kit's in-process Firebase Installations / Remote Config clients cannot connect; translation models
-and voice packs are downloaded by Android's system DownloadManager.
+backend (`TransportBackendDiscovery`) and start-up providers. **AniSub holds the INTERNET permission
+(restored in 0.3.1 because Android's DownloadProvider refuses callers without it)**: it is app-wide, not a
+per-host firewall, so ML Kit's in-process Firebase Installations / Remote Config clients may contact Google
+(installation id, app/device info, never subtitle text). Translation models and voice packs are downloaded
+by Android's system DownloadManager and verified (size + SHA-256) inside AniSub.
 Details and caveats: [docs/voices.md](docs/voices.md).
 
 ## Approved Cake candidate — not published by this task

@@ -42,8 +42,8 @@ public class SettingsStorageRulesTest {
         Set<String> kept = SettingsActivity.defaultPackIds(registry);
         assertTrue(kept.contains("vi-alternate"));
         assertTrue(kept.contains(catalog.forLanguage("en").id));
-        assertFalse(kept.contains(catalog.defaultPack().id));
-        assertEquals(2, kept.size());
+        assertTrue(kept.contains(catalog.defaultPack().id)); // the bootstrap VAIS pack is always kept
+        assertEquals(3, kept.size());
     }
     @Test public void missingOrDisabledDefaultKeepsEffectiveInstalledFallback() throws Exception {
         VoiceCatalog catalog = catalog(); AniSubPrefs prefs = prefs();

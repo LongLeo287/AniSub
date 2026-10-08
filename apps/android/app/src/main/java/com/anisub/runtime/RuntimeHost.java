@@ -258,8 +258,15 @@ public final class RuntimeHost {
     public String setVoiceEnabled(String id,boolean enabled){synchronized(residency){VoiceRegistry r=registry();VoiceRegistry.Entry e=r.find(id);if(e==null)return "UNSUPPORTED";
         if(!enabled&&!r.canDisable(id))return "LAST_DEFAULT_VOICE";settings.setVoiceEnabled(id,enabled);if(!enabled)repairDefault(r,e,null);changed();return null;}}
     private void repairDefault(VoiceRegistry r,VoiceRegistry.Entry e,String removedPack){if(e.id.equals(settings.defaultVoice(e.kind.name(),e.language))){VoiceRegistry.Entry next=r.replacement(e,removedPack);settings.setDefaultVoice(e.kind.name(),e.language,next==null?null:next.id);}}
-    public String deletePack(String id){synchronized(residency){VoiceRegistry r=registry();if(sessionActive||previewActive()||anyPackBusy()||!r.canDeletePack(id))return "IN_USE";
-        VoicePackManager m=packs.get(id);if(m==null)return "UNSUPPORTED";String result=m.delete();if(result==null)for(VoiceRegistry.Entry e:r.all())if(id.equals(e.packId))repairDefault(r,e,id);changed();return result;}}
+    /** Checks under the gate, then deletes on the caller's thread holding MAINTENANCE (no session/preview can start); never IO under the monitor. */
+    public String deletePack(String id){
+        VoiceRegistry r;VoicePackManager m;
+        synchronized(residency){r=registry();if(sessionActive||previewActive()||anyPackBusy()||!r.canDeletePack(id))return "IN_USE";
+            m=packs.get(id);if(m==null)return "UNSUPPORTED";if(!residency.maintenance())return "IN_USE";}
+        String result;
+        try{result=m.delete();}finally{residency.end(ResidencyGate.Owner.MAINTENANCE);}
+        synchronized(residency){if(result==null)for(VoiceRegistry.Entry e:r.all())if(id.equals(e.packId))repairDefault(r,e,id);}
+        changed();return result;}
     /** Bulk cleanup must not remove any effective language default, even if Settings changed meanwhile. */
     public String deletePackUnlessDefault(String id){synchronized(residency){VoiceRegistry r=registry();
         for(VoiceRegistry.Entry entry:r.all())if(id.equals(entry.packId)){
@@ -297,10 +304,11 @@ public final class RuntimeHost {
     public String clearSafeCache() {
         synchronized (residency) {
             if (catalogApplying || catalogs!=null&&catalogs.busy() || sessionActive || previewActive() || anyPackBusy()
-                    || translation.busy() || engine!=null&&engine.state()!=AiSpeechEngine.State.IDLE) return "IN_USE";
-            try { com.anisub.runtime.models.StorageInventory.clearCache(app.getCacheDir()); return null; }
-            catch (IOException failure) { return "STORAGE"; }
+                    || translation.busy() || engine!=null&&engine.state()!=AiSpeechEngine.State.IDLE || !residency.maintenance()) return "IN_USE";
         }
+        try { com.anisub.runtime.models.StorageInventory.clearCache(app.getCacheDir()); return null; }
+        catch (IOException failure) { return "STORAGE"; }
+        finally { residency.end(ResidencyGate.Owner.MAINTENANCE); }
     }
 
     public VoicePackManager.Status packStatus() { return voices == null ? null : voices.status(); }
