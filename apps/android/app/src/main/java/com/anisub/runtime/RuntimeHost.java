@@ -148,7 +148,7 @@ public final class RuntimeHost {
             File root = new File(app.getFilesDir(), "voices").getCanonicalFile();
             ModelStore store = new ModelStore(root, new StorageBudget(StorageBudget.DEFAULT_QUOTA), new IntegrityVerifier(),
                     System::currentTimeMillis, point -> { });
-            // No INTERNET permission: every download goes through the system DownloadManager.
+            // Every download goes through the system DownloadManager (which requires the caller to hold INTERNET).
             VoicePackManager.FileFetcher source = DebugSources.wrap(new SystemDownloadFetcher(app, "AniSub/" + versionName), app);
             Map<String, VoicePackManager> byLanguage = new LinkedHashMap<>();
             for (String lang : LanguageTags.VOICE) {

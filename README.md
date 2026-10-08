@@ -58,8 +58,8 @@ ngôn ngữ giọng đọc được dịch ngay trên TV, nên AI Thuyết minh 
      `https://github.com/LongLeo287/AniSub/releases/latest/download/AniSub.apk`
 3. Ngay lần đầu AniSub chạy (AniBox kết nối hoặc bạn mở AniSub), giọng tiếng Việt mặc định (khoảng
    64 MB, từ GitHub của AniSub) và gói dịch tiếng Việt (khoảng 30 MB, từ máy chủ Google) **tự tải**;
-   mở **AniSub** để xem tiến độ, giấy phép và bấm **Nghe thử**. AniSub không có quyền Internet: mọi tệp
-   được tải bằng trình tải xuống của Android rồi kiểm tra SHA-256. Giọng tiếng Anh là tùy chọn.
+   mở **AniSub** để xem tiến độ, giấy phép và bấm **Nghe thử**. Mọi tệp được tải bằng trình tải
+   xuống của Android rồi kiểm tra SHA-256 (ML Kit của Google có thể liên lạc máy chủ Google, không gửi phụ đề). Giọng tiếng Anh là tùy chọn.
 4. Trong AniBox, vào **Cài đặt › AniSub** chọn **Ngôn ngữ giọng đọc** (Việt hoặc Anh), rồi bấm chip
    **Thuyết minh** trong trình phát. Khi giọng AI đọc, AniBox tự giảm âm lượng phim rồi trả lại khi đọc xong.
 5. Cập nhật: khi có AniSub mới, AniBox bắt cập nhật lúc mở app (trường `mandatory` trong `anisub.json`; vắng

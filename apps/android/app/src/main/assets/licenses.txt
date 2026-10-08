@@ -13,11 +13,12 @@ dl.google.com) TỰ TẢI về, không hỏi trước; tiến độ hiện trong
 chưa có (vd. phụ đề tiếng Nhật), gói đó cũng tự tải từ Google nếu "Tự tải gói dịch khi cần" đang bật
 (mặc định bật; tắt trong Cài đặt). Các giọng khác (vd. tiếng Anh) chỉ tải khi bạn chọn.
 
-QUYỀN RIÊNG TƯ: AniSub không thu âm, không chụp màn hình và không gửi phụ đề ra ngoài. AniSub KHÔNG
-có quyền Internet: mọi tệp được tải bằng trình tải xuống của hệ thống Android (Download Manager) —
-gói giọng từ bản phát hành AniSub trên GitHub, mô hình dịch từ máy chủ Google (dl.google.com) — rồi
-được kiểm tra trong AniSub. Vì không có quyền Internet, các lệnh gọi mạng riêng của ML Kit (Firebase
-Installations / Remote Config của Google) không kết nối được. Giọng AI và bản dịch chạy hoàn toàn trên TV.
+QUYỀN RIÊNG TƯ: AniSub không thu âm, không chụp màn hình và không gửi phụ đề ra ngoài. Mọi tệp được tải
+bằng trình tải xuống của hệ thống Android (Download Manager) — gói giọng từ bản phát hành AniSub trên
+GitHub, mô hình dịch từ máy chủ Google (dl.google.com) — rồi được kiểm tra trong AniSub (cần quyền
+Internet). Thư viện ML Kit của Google có thể tự liên lạc với máy chủ Google (Firebase Installations /
+Remote Config: mã cài đặt, thông tin ứng dụng và thiết bị) — không bao giờ gửi câu phụ đề; thống kê sử
+dụng của ML Kit đã tắt. Giọng AI và bản dịch chạy hoàn toàn trên TV.
 
 THÀNH PHẦN BÊN THỨ BA TRONG APK
 

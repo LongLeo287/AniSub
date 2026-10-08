@@ -348,7 +348,7 @@ public final class SettingsActivity extends Activity {
         if (host.anyPackBusy()) { info("Đang tải gói khác", "Mỗi lần chỉ tải một gói giọng. Chờ gói đang tải xong rồi thử lại."); return; }
         String message = "Gói: " + pack.name + "\nDung lượng tải: " + VoicePackManager.formatBytes(pack.totalBytes)
                 + " (cần thêm khoảng 128 MB trống dự phòng)\n\nGiấy phép: " + pack.license + "\n\n" + pack.attribution
-                + "\n\nTải từ bản phát hành công khai của AniSub trên GitHub bằng trình tải xuống của hệ thống Android (AniSub không có quyền Internet). Mỗi tệp được kiểm tra SHA-256 trước khi cài. "
+                + "\n\nTải từ bản phát hành công khai của AniSub trên GitHub bằng trình tải xuống của hệ thống Android. Mỗi tệp được kiểm tra SHA-256 trước khi cài. "
                 + "Sau khi tải, giọng chạy hoàn toàn trên TV, không gửi phụ đề đi đâu.";
         confirm("Tải " + rows.label + "?", message, "Đồng ý tải", () -> {
             if (host.sessionActive() || host.anyPackBusy()) return;
